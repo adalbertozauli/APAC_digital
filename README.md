@@ -53,6 +53,23 @@ Instalador\install.exe
 
 Ele instala o app em `%LOCALAPPDATA%\APACDigital`, cria atalhos no menu Iniciar e na area de trabalho, e adiciona uma entrada para desinstalar em "Aplicativos instalados" do Windows.
 
+## Como publicar uma release no GitHub
+
+Depois de enviar o codigo para o GitHub, crie uma tag de versao:
+
+```powershell
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+O GitHub Actions vai gerar o instalador e anexar automaticamente em "Releases" com o nome:
+
+```text
+APACDigitalSetup.exe
+```
+
+Esse e o arquivo que pode ser compartilhado com usuarios finais.
+
 Opcao simples, sem gerar instalador:
 
 ```powershell
