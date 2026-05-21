@@ -40,5 +40,5 @@ jobs:
       - name: Upload installer artifact
         uses: actions/upload-artifact@v4
         with:
-          name: APACDigitalSetup-win-x64
-          path: artifacts\installer\APACDigitalSetup.exe
+          name: install-exe
+          path: Instalador\install.exe

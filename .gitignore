@@ -3,6 +3,7 @@ bin/
 obj/
 publish/
 artifacts/
+Instalador/
 
 # Local restore/build helpers
 .dotnet-home/

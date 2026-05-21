@@ -1,7 +1,7 @@
 param(
   [string]$Configuration = "Release",
   [string]$Runtime = "win-x64",
-  [string]$InstallerName = "APACDigitalSetup.exe",
+  [string]$InstallerName = "install.exe",
   [switch]$NoRestore
 )
 
@@ -10,13 +10,14 @@ $ErrorActionPreference = "Stop"
 $root = Resolve-Path (Join-Path $PSScriptRoot "..")
 $publishDir = Join-Path $root "artifacts\publish\APACDigital"
 $installerDir = Join-Path $root "artifacts\installer"
+$friendlyInstallerDir = Join-Path $root "Instalador"
 $stagingDir = Join-Path $root "artifacts\installer\staging"
 $packagePath = Join-Path $stagingDir "APACDigital.zip"
 $outputPath = Join-Path $installerDir $InstallerName
 $setupProject = Join-Path $root "installer\Setup\APACDigitalInstaller.csproj"
 $setupPublishDir = Join-Path $stagingDir "setup-publish"
 
-New-Item -ItemType Directory -Force -Path $installerDir, $stagingDir | Out-Null
+New-Item -ItemType Directory -Force -Path $installerDir, $friendlyInstallerDir, $stagingDir | Out-Null
 
 $publishArgs = @{
   Configuration = $Configuration
@@ -45,9 +46,11 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Copy-Item -LiteralPath (Join-Path $setupPublishDir "APACDigitalSetup.exe") -Destination $outputPath -Force
+Copy-Item -LiteralPath $outputPath -Destination (Join-Path $friendlyInstallerDir "install.exe") -Force
 
 if (-not (Test-Path -LiteralPath $outputPath)) {
   throw "Nao foi possivel gerar o instalador em: $outputPath"
 }
 
 Write-Host "Instalador criado em: $outputPath"
+Write-Host "Copia amigavel criada em: $(Join-Path $friendlyInstallerDir "install.exe")"

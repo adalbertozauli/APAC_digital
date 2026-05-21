@@ -48,7 +48,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\build-installe
 O instalador fica em:
 
 ```text
-artifacts\installer\APACDigitalSetup.exe
+Instalador\install.exe
 ```
 
 Ele instala o app em `%LOCALAPPDATA%\APACDigital`, cria atalhos no menu Iniciar e na area de trabalho, e adiciona uma entrada para desinstalar em "Aplicativos instalados" do Windows.
