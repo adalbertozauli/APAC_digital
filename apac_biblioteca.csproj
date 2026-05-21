@@ -20,6 +20,12 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Remove="installer\Setup\**\*.cs" />
+    <EmbeddedResource Remove="installer\Setup\**\*" />
+    <None Remove="installer\Setup\**\*" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="itext" Version="8.0.5" />
     <PackageReference Include="itext.bouncy-castle-adapter" Version="8.0.5" />
     <PackageReference Include="BouncyCastle.Cryptography" Version="2.6.2" />

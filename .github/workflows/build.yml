@@ -28,8 +28,17 @@ jobs:
       - name: Publish
         run: .\scripts\publish.ps1 -NoRestore
 
-      - name: Upload artifact
+      - name: Build installer
+        run: .\scripts\build-installer.ps1 -NoRestore
+
+      - name: Upload portable artifact
         uses: actions/upload-artifact@v4
         with:
           name: APACDigital-win-x64
           path: artifacts\publish\APACDigital
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: APACDigitalSetup-win-x64
+          path: artifacts\installer\APACDigitalSetup.exe

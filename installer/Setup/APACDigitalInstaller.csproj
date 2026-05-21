@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>APACDigitalSetup</AssemblyName>
+    <RootNamespace>APACDigitalInstaller</RootNamespace>
+    <Product>APAC Digital Setup</Product>
+    <Company>ESF Sao Carlos 2</Company>
+    <Version>1.0.0</Version>
+    <ApplicationIcon>..\..\icone.ico</ApplicationIcon>
+    <PublishSingleFile>true</PublishSingleFile>
+    <SelfContained>true</SelfContained>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <ReadyToRun>true</ReadyToRun>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\artifacts\installer\staging\APACDigital.zip" Link="APACDigital.zip" />
+  </ItemGroup>
+
+</Project>

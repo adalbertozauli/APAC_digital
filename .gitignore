@@ -7,6 +7,7 @@ artifacts/
 # Local restore/build helpers
 .dotnet-home/
 .nuget/
+Microsoft/
 
 # IDE/user files
 .vs/

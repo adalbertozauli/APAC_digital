@@ -33,7 +33,27 @@ Essa pasta inclui o executavel, o `cids.txt` e o modelo PDF em `Templates`.
 
 ## Como instalar
 
-Opcao simples, sem administrador:
+Opcao mais amigavel, gerando um instalador `.exe`:
+
+```powershell
+.\scripts\build-installer.ps1
+```
+
+Se o Windows bloquear scripts PowerShell, use:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\build-installer.ps1
+```
+
+O instalador fica em:
+
+```text
+artifacts\installer\APACDigitalSetup.exe
+```
+
+Ele instala o app em `%LOCALAPPDATA%\APACDigital`, cria atalhos no menu Iniciar e na area de trabalho, e adiciona uma entrada para desinstalar em "Aplicativos instalados" do Windows.
+
+Opcao simples, sem gerar instalador:
 
 ```powershell
 .\scripts\install.ps1
@@ -49,7 +69,7 @@ Para remover:
 
 ## Instalador com assistente
 
-Tambem existe um roteiro para Inno Setup em:
+Tambem existe um roteiro alternativo para Inno Setup em:
 
 ```text
 installer\APACDigital.iss
