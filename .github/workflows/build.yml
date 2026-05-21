@@ -1,0 +1,35 @@
+name: Build
+
+on:
+  push:
+    branches: ["main", "master"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Restore
+        run: dotnet restore .\apac_biblioteca.csproj --configfile .\NuGet.Config
+
+      - name: Build
+        run: dotnet build .\apac_biblioteca.csproj --configuration Release --no-restore
+
+      - name: Publish
+        run: .\scripts\publish.ps1 -NoRestore
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: APACDigital-win-x64
+          path: artifacts\publish\APACDigital

@@ -1,0 +1,31 @@
+# Build outputs
+bin/
+obj/
+publish/
+artifacts/
+
+# Local restore/build helpers
+.dotnet-home/
+.nuget/
+
+# IDE/user files
+.vs/
+.vscode/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Generated app bundles and local executable copies
+DiretorioExecutavel/
+
+# Generated PDFs
+Saida/
+
+# Logs and temporary files
+*.log
+*.tmp
+*.bak
+*.swp
+Thumbs.db
+desktop.ini
