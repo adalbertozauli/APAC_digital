@@ -2,6 +2,7 @@ param(
   [string]$Configuration = "Release",
   [string]$Runtime = "win-x64",
   [string]$Output = "artifacts\publish\APACDigital",
+  [string]$Version = "",
   [switch]$NoRestore
 )
 
@@ -20,12 +21,18 @@ if (-not $NoRestore) {
   }
 }
 
+$versionArgs = @()
+if ($Version) {
+  $versionArgs = @("-p:Version=$Version")
+}
+
 dotnet publish $project `
   --configuration $Configuration `
   --runtime $Runtime `
   --self-contained true `
   --no-restore `
-  --output $outputPath
+  --output $outputPath `
+  @versionArgs
 
 if ($LASTEXITCODE -ne 0) {
   throw "Falha ao publicar o aplicativo."

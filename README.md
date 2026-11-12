@@ -17,6 +17,12 @@ dotnet build .\apac_biblioteca.csproj
 dotnet run --project .\apac_biblioteca.csproj
 ```
 
+## Onde ficam os laudos
+
+Os PDFs gerados sao salvos em `Documentos\APAC Digital\Laudos`, com data e hora no nome do arquivo
+(ex.: `Laudo_JOAO_DA_SILVA_2026-11-12_143005.pdf`). Essa pasta nao e apagada ao desinstalar o app.
+Laudos de versoes antigas (pasta `Saida` dentro do programa) sao movidos para la ao abrir o app.
+
 ## Como publicar
 
 ```powershell

@@ -2,6 +2,7 @@ param(
   [string]$Configuration = "Release",
   [string]$Runtime = "win-x64",
   [string]$InstallerName = "install.exe",
+  [string]$Version = "",
   [switch]$NoRestore
 )
 
@@ -28,6 +29,12 @@ if ($NoRestore) {
   $publishArgs.NoRestore = $true
 }
 
+$versionArgs = @()
+if ($Version) {
+  $publishArgs.Version = $Version
+  $versionArgs = @("-p:Version=$Version")
+}
+
 & (Join-Path $PSScriptRoot "publish.ps1") @publishArgs
 
 Remove-Item -LiteralPath $packagePath -Force -ErrorAction SilentlyContinue
@@ -39,7 +46,8 @@ dotnet publish $setupProject `
   --configuration $Configuration `
   --runtime $Runtime `
   --self-contained true `
-  --output $setupPublishDir
+  --output $setupPublishDir `
+  @versionArgs
 
 if ($LASTEXITCODE -ne 0) {
   throw "Falha ao publicar o instalador."

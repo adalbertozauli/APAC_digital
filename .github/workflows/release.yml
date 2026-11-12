@@ -31,7 +31,12 @@ jobs:
         run: dotnet restore .\apac_biblioteca.csproj --configfile .\NuGet.Config
 
       - name: Build installer
-        run: .\scripts\build-installer.ps1 -NoRestore
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ github.event.inputs.version || github.ref_name }}
+        run: |
+          $version = $env:RELEASE_TAG.TrimStart('v')
+          .\scripts\build-installer.ps1 -NoRestore -Version $version
 
       - name: Prepare release files
         shell: pwsh

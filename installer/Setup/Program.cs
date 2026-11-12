@@ -9,7 +9,9 @@ namespace APACDigitalInstaller;
 internal static class Program
 {
     private const string AppName = "APAC Digital";
-    private const string AppVersion = "1.0.0";
+    // Versão vem do build (-p:Version=...), em vez de ficar fixa no código
+    private static readonly string AppVersion =
+        Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.0.0";
     private const string Publisher = "ESF Sao Carlos 2";
     private const string ExeName = "APACDigital.exe";
 

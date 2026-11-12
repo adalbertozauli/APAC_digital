@@ -7,6 +7,7 @@ using System.IO;
 using System.Diagnostics;
 using System.Linq;
 using System.Collections.Generic;
+using System.Globalization;
 
 namespace Projeto_APAC
 {
@@ -24,12 +25,42 @@ namespace Projeto_APAC
         // Dicionário para armazenar os textos dos placeholders
         private Dictionary<TextBox, string> placeholders = new Dictionary<TextBox, string>();
 
+        // Último diagnóstico preenchido automaticamente pela busca de CID
+        private string? diagnosticoAutomatico;
+        private bool formatandoData;
+
+        private static readonly string PastaLaudos = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "APAC Digital", "Laudos");
+
         public FormPrincipal()
         {
             ConfigurarJanela();
             CriarInterface();
             AplicarTema();
             ConfigurarTodosPlaceholders();
+            MigrarLaudosAntigos();
+        }
+
+        // Versões anteriores salvavam os laudos em "Saida", dentro da pasta do programa,
+        // que é apagada ao desinstalar. Move esses arquivos para a pasta de Documentos.
+        private void MigrarLaudosAntigos()
+        {
+            string pastaAntiga = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Saida");
+            try
+            {
+                if (!Directory.Exists(pastaAntiga)) return;
+                Directory.CreateDirectory(PastaLaudos);
+                foreach (string arquivo in Directory.GetFiles(pastaAntiga, "*.pdf"))
+                {
+                    string destino = Path.Combine(PastaLaudos, Path.GetFileName(arquivo));
+                    if (!File.Exists(destino)) File.Move(arquivo, destino);
+                }
+                if (!Directory.EnumerateFileSystemEntries(pastaAntiga).Any()) Directory.Delete(pastaAntiga);
+            }
+            catch (Exception)
+            {
+                // Migração é opcional: se falhar, os arquivos continuam onde estavam.
+            }
         }
 
         private void ConfigurarJanela()
@@ -78,6 +109,7 @@ namespace Projeto_APAC
 
             AdicionarLabel("Nascimento:", 30, y);
             txtDataNasc = AdicionarTextBox(30, y + 22, 130);
+            txtDataNasc.MaxLength = 10;
             txtDataNasc.TextChanged += (s, e) => FormatarData(txtDataNasc);
 
             AdicionarLabel("Sexo:", 185, y);
@@ -158,7 +190,7 @@ namespace Projeto_APAC
             txt.ForeColor = Color.Gray;
 
             txt.Enter += (s, e) => {
-                if (txt.Text == placeholders[txt]) {
+                if (EhPlaceholder(txt)) {
                     txt.Text = "";
                     txt.ForeColor = isDarkMode ? Color.FromArgb(240, 240, 240) : Color.FromArgb(40, 40, 40);
                 }
@@ -171,6 +203,13 @@ namespace Projeto_APAC
                 }
             };
         }
+
+        // O campo CID converte o texto para maiúsculas (inclusive o placeholder),
+        // por isso a comparação ignora maiúsculas/minúsculas.
+        private bool EhPlaceholder(TextBox t) =>
+            placeholders.TryGetValue(t, out string? p) && string.Equals(t.Text, p, StringComparison.OrdinalIgnoreCase);
+
+        private string ValorReal(TextBox t) => EhPlaceholder(t) ? "" : t.Text.Trim();
 
         private void AplicarTema()
         {
@@ -190,7 +229,7 @@ namespace Projeto_APAC
                 if (c is TextBox t) { 
                     t.BackColor = inputBg; 
                     // Se o campo tiver placeholder, mantém cinza. Se tiver texto real, usa cor do tema.
-                    if (placeholders.ContainsKey(t) && t.Text == placeholders[t])
+                    if (EhPlaceholder(t))
                         t.ForeColor = Color.Gray;
                     else
                         t.ForeColor = fg; 
@@ -248,20 +287,34 @@ namespace Projeto_APAC
 
         private void RealizarBuscaCid()
         {
-            // Ignora a busca se o texto no campo for apenas o placeholder
-            if (txtCid.Text == placeholders[txtCid]) return;
+            string cid = ValorReal(txtCid).ToUpper();
+            string? descricao = string.IsNullOrEmpty(cid) ? null : BuscarDescricaoCid(cid);
 
-            string cid = txtCid.Text.Trim().ToUpper();
-            if (string.IsNullOrEmpty(cid)) return;
+            if (descricao != null) {
+                txtDiagnostico.Text = descricao;
+                txtDiagnostico.ForeColor = isDarkMode ? Color.FromArgb(240, 240, 240) : Color.FromArgb(40, 40, 40);
+                diagnosticoAutomatico = descricao;
+            }
+            else if (diagnosticoAutomatico != null && txtDiagnostico.Text == diagnosticoAutomatico) {
+                // CID trocado/apagado: remove o diagnóstico que veio do CID anterior.
+                // Um diagnóstico digitado à mão é mantido.
+                txtDiagnostico.Text = placeholders[txtDiagnostico];
+                txtDiagnostico.ForeColor = Color.Gray;
+                diagnosticoAutomatico = null;
+            }
+        }
+
+        private static string? BuscarDescricaoCid(string cid)
+        {
             string path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "cids.txt");
-            if (File.Exists(path)) {
+            try {
+                if (!File.Exists(path)) return null;
                 var match = File.ReadLines(path)
                     .Select(l => l.Split(',', 2))
                     .FirstOrDefault(p => p.Length == 2 && p[0].Trim().ToUpper() == cid);
-                if (match != null) {
-                    txtDiagnostico.Text = match[1].Trim().ToUpper();
-                    txtDiagnostico.ForeColor = isDarkMode ? Color.FromArgb(240, 240, 240) : Color.FromArgb(40, 40, 40);
-                }
+                return match?[1].Trim().ToUpper();
+            } catch (IOException) {
+                return null;
             }
         }
 
@@ -273,49 +326,79 @@ namespace Projeto_APAC
                     t.ForeColor = Color.Gray;
                 }
             }
+            diagnosticoAutomatico = null;
             cbSexo.SelectedIndex = -1; cbRaca.SelectedIndex = -1; cbQuantidade.SelectedIndex = 0;
             txtNome.Focus();
         }
 
+        // Mantém o formato dd/MM/aaaa a partir dos dígitos digitados.
+        // As barras são recalculadas a cada mudança, então o Backspace funciona normalmente.
         private void FormatarData(TextBox tb)
         {
-            // Ignora formatação se for placeholder
-            if (tb.Text == placeholders[txtDataNasc]) return;
+            if (formatandoData || EhPlaceholder(tb)) return;
 
-            string d = tb.Text.Replace("/", "");
-            if (d.Length >= 2 && tb.Text.Length == 2) tb.Text += "/";
-            else if (d.Length >= 4 && tb.Text.Length == 5) tb.Text += "/";
-            tb.SelectionStart = tb.Text.Length;
+            int digitosAntesDoCursor = tb.Text.Substring(0, Math.Min(tb.SelectionStart, tb.Text.Length)).Count(char.IsDigit);
+            string digitos = new string(tb.Text.Where(char.IsDigit).Take(8).ToArray());
+            string formatado = digitos.Length switch {
+                > 4 => $"{digitos[..2]}/{digitos[2..4]}/{digitos[4..]}",
+                > 2 => $"{digitos[..2]}/{digitos[2..]}",
+                _ => digitos
+            };
+            if (formatado == tb.Text) return;
+
+            int cursor = 0, vistos = 0;
+            while (cursor < formatado.Length && vistos < digitosAntesDoCursor) {
+                if (char.IsDigit(formatado[cursor])) vistos++;
+                cursor++;
+            }
+
+            formatandoData = true;
+            tb.Text = formatado;
+            tb.SelectionStart = cursor;
+            formatandoData = false;
         }
 
         private void BtnGerar_Click(object? sender, EventArgs e)
         {
             // Verifica se o nome foi preenchido de verdade
-            if (string.IsNullOrWhiteSpace(txtNome.Text) || txtNome.Text == placeholders[txtNome]) { 
-                MessageBox.Show("Nome obrigatório!"); 
-                return; 
+            if (ValorReal(txtNome) == "") {
+                MessageBox.Show("Nome obrigatório!");
+                return;
             }
 
+            string dataNasc = ValorReal(txtDataNasc);
+            if (dataNasc != "" && (!DateTime.TryParseExact(dataNasc, "dd/MM/yyyy", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime dtNasc)
+                                   || dtNasc > DateTime.Today || dtNasc.Year < 1900)) {
+                MessageBox.Show("Data de nascimento inválida. Use o formato dd/mm/aaaa.");
+                txtDataNasc.Focus();
+                return;
+            }
+
+            // Garante que o diagnóstico corresponde ao CID atual (caso o foco ainda esteja no campo CID)
+            RealizarBuscaCid();
+
             var pac = new DadosApac {
-                NomePaciente = txtNome.Text.Trim().ToUpper(),
-                // Se o campo contiver o placeholder, enviamos vazio para o PDF
-                DataNascimento = (txtDataNasc.Text == placeholders[txtDataNasc]) ? "" : txtDataNasc.Text,
+                NomePaciente = ValorReal(txtNome).ToUpper(),
+                DataNascimento = dataNasc,
                 Sexo = cbSexo.Text,
-                NomeMae = (txtMae.Text == placeholders[txtMae]) ? "" : txtMae.Text.Trim().ToUpper(),
-                ProcedimentoPrincipal = (txtProcedimento.Text == placeholders[txtProcedimento]) ? "" : txtProcedimento.Text.Trim().ToUpper(),
-                DescricaoDiagnostico = (txtDiagnostico.Text == placeholders[txtDiagnostico]) ? "" : txtDiagnostico.Text.Trim().ToUpper(),
-                Cid10Principal = (txtCid.Text == placeholders[txtCid]) ? "" : txtCid.Text.Trim().ToUpper(),
-                Observacoes = (txtObs.Text == placeholders[txtObs]) ? "" : txtObs.Text.Trim().ToUpper(),
+                NomeMae = ValorReal(txtMae).ToUpper(),
+                ProcedimentoPrincipal = ValorReal(txtProcedimento).ToUpper(),
+                DescricaoDiagnostico = ValorReal(txtDiagnostico).ToUpper(),
+                Cid10Principal = ValorReal(txtCid).ToUpper(),
+                Observacoes = ValorReal(txtObs).ToUpper(),
                 Quantidade = cbQuantidade.Text,
                 RacaCor = cbRaca.Text
             };
 
             string pasta = AppDomain.CurrentDomain.BaseDirectory;
             string nomeArquivo = CriarNomeArquivoSeguro(pac.NomePaciente);
-            string outPath = Path.Combine(pasta, "Saida", $"Laudo_{nomeArquivo}.pdf");
+            // Data e hora no nome evitam sobrescrever laudos anteriores (ou um PDF aberto no leitor)
+            string outPath = Path.Combine(PastaLaudos, $"Laudo_{nomeArquivo}_{DateTime.Now:yyyy-MM-dd_HHmmss}.pdf");
             try {
-                new GeradorPdfService().PreencherLaudo(pac, Path.Combine(pasta, "Templates", "Laudo de APAC - Modelo.pdf"), outPath);
+                var avisos = new GeradorPdfService().PreencherLaudo(pac, Path.Combine(pasta, "Templates", "Laudo de APAC - Modelo.pdf"), outPath);
                 Process.Start(new ProcessStartInfo(outPath) { UseShellExecute = true });
+                if (avisos.Count > 0)
+                    MessageBox.Show(string.Join("\n\n", avisos), "Atenção", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             } catch (Exception ex) { MessageBox.Show("Erro: " + ex.Message); }
         }
 
