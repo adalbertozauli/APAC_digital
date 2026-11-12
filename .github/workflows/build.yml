@@ -25,6 +25,9 @@ jobs:
       - name: Build
         run: dotnet build .\apac_biblioteca.csproj --configuration Release --no-restore
 
+      - name: Test
+        run: dotnet run --project .\tests\APACDigital.Tests\APACDigital.Tests.csproj --configuration Release
+
       - name: Publish
         run: .\scripts\publish.ps1 -NoRestore
 

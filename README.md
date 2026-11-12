@@ -30,6 +30,31 @@ profissional (nome completo e CNS de 15 digitos, validado), ou "Editar"/"Excluir
 O cadastro fica em `%APPDATA%\APAC Digital\profissionais.json` e o ultimo profissional escolhido
 e lembrado ao abrir o app.
 
+## Atalhos
+
+- `Enter`: proximo campo (nas sugestoes de CID, escolhe a opcao marcada)
+- `Ctrl+Enter`: gerar o PDF
+- `Ctrl+N` ou "Novo laudo, mesmo paciente": mantem profissional e paciente e limpa procedimento, CID e justificativa
+
+## Tabela CID-10
+
+`cids.txt` contem a tabela CID-10 oficial do DATASUS (categorias e subcategorias, cerca de 14,5 mil codigos),
+convertida de `CID10CSV.zip` (http://www2.datasus.gov.br/cid10/V2008/) para UTF-8 no formato `CODIGO,DESCRICAO`.
+O CID pode ser digitado com ou sem ponto (`M545` ou `M54.5`), ou buscado pelo nome no campo Diagnostico.
+
+## Testes
+
+```powershell
+dotnet run --project .\tests\APACDigital.Tests
+```
+
+Roda os testes automaticos (geracao do PDF, cadastro de profissionais e tela) e termina com `TODOS OK`.
+O GitHub Actions executa os mesmos testes a cada envio. Para salvar capturas da tela e um laudo de exemplo:
+
+```powershell
+dotnet run --project .\tests\APACDigital.Tests -- telas
+```
+
 ## Como publicar
 
 ```powershell
@@ -113,7 +138,8 @@ Depois de executar `.\scripts\publish.ps1`, abra esse arquivo no Inno Setup e co
 - `Models/DadosApac.cs`: dados usados para preencher o laudo.
 - `Services/GeradorPdfService.cs`: preenchimento do PDF via iText.
 - `Templates/Laudo de APAC - Modelo.pdf`: modelo PDF preenchivel.
-- `cids.txt`: lista local de CIDs usada na busca automatica.
+- `cids.txt`: tabela CID-10 do DATASUS usada na busca automatica.
+- `tests/APACDigital.Tests`: testes automaticos.
 
 ## Observacao de licenca
 

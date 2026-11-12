@@ -37,8 +37,8 @@ namespace Projeto_APAC.Services
                     IDictionary<string, PdfFormField> campos = form.GetAllFormFields();
 
                     // --- DADOS FIXOS ---
-                    SetCampo(campos, "txtUnidade", "ESF SÃO CARLOS 2", 9);
-                    SetCampo(campos, "txtMedico", dados.NomeProfissional, 9);
+                    SetCampoAjustado(campos, "txtUnidade", "ESF SÃO CARLOS 2", "Unidade", avisos);
+                    SetCampoAjustado(campos, "txtMedico", dados.NomeProfissional, "Nome do profissional", avisos);
 
                     // --- CAMPO 44: CNS PROFISSIONAL (c1 a c15) ---
                     string cnsVal = dados.CnsProfissional ?? "";
@@ -62,9 +62,9 @@ namespace Projeto_APAC.Services
                     SetCampo(campos, "txtAno", hoje.ToString("yyyy"), 10);
 
                     // --- DADOS DO PACIENTE ---
-                    SetCampo(campos, "txtNome", dados.NomePaciente, 9);
-                    SetCampo(campos, "txtRacaCor", dados.RacaCor, 9);
-                    SetCampo(campos, "txtNomeMae", dados.NomeMae, 9);
+                    SetCampoAjustado(campos, "txtNome", dados.NomePaciente, "Nome do paciente", avisos);
+                    SetCampoAjustado(campos, "txtRacaCor", dados.RacaCor, "Raça/cor", avisos);
+                    SetCampoAjustado(campos, "txtNomeMae", dados.NomeMae, "Nome da mãe", avisos);
 
                     if (DateTime.TryParseExact(dados.DataNascimento, "dd/MM/yyyy", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime dtNasc))
                     {
@@ -77,10 +77,10 @@ namespace Projeto_APAC.Services
                     else if (dados.Sexo?.ToUpper() == "F") SetCampo(campos, "txtFem", "X", 10);
 
                     // --- DADOS CLÍNICOS ---
-                    SetCampo(campos, "txtProcedimento", dados.ProcedimentoPrincipal, 9);
+                    SetCampoAjustado(campos, "txtProcedimento", dados.ProcedimentoPrincipal, "Procedimento", avisos);
                     SetCampo(campos, "txtQuantidade", dados.Quantidade, 9);
-                    SetCampo(campos, "txtCid", dados.Cid10Principal, 9);
-                    SetCampo(campos, "txtDiagnostico", dados.DescricaoDiagnostico, 9);
+                    SetCampoAjustado(campos, "txtCid", dados.Cid10Principal, "CID-10", avisos);
+                    SetCampoAjustado(campos, "txtDiagnostico", dados.DescricaoDiagnostico, "Diagnóstico", avisos);
 
                     // A justificativa pode ser longa: reduz a fonte até caber no campo.
                     float fonteObs = FonteObsMaxima;
@@ -124,6 +124,28 @@ namespace Projeto_APAC.Services
                 campos[nome].SetFontSize(tamanhoFonte);
                 campos[nome].SetValue(valorFormatado);
             }
+        }
+
+        private const float FonteLinhaMaxima = 9f;
+        private const float FonteLinhaMinima = 6f;
+        private PdfFont? helvetica;
+
+        // Campos de uma linha: reduz a letra (9 → 6) até o texto caber na largura do campo.
+        // Se nem assim couber, preenche no mínimo e avisa que pode ter sido cortado.
+        private void SetCampoAjustado(IDictionary<string, PdfFormField> campos, string nome, string? valor, string rotulo, List<string> avisos)
+        {
+            if (string.IsNullOrWhiteSpace(valor) || !campos.TryGetValue(nome, out PdfFormField? campo)) return;
+            float tamanho = FonteLinhaMaxima;
+            Rectangle? area = ObterAreaDoCampo(campo);
+            if (area != null)
+            {
+                helvetica ??= PdfFontFactory.CreateFont(StandardFonts.HELVETICA);
+                float largura = area.GetWidth() - 6;
+                while (tamanho > FonteLinhaMinima && helvetica.GetWidth(valor, tamanho) > largura) tamanho -= 0.5f;
+                if (helvetica.GetWidth(valor, tamanho) > largura)
+                    avisos.Add($"O campo \"{rotulo}\" é longo demais para o espaço do laudo e pode ter sido cortado. Revise o PDF ou abrevie o texto.");
+            }
+            SetCampo(campos, nome, valor, tamanho);
         }
 
         private static string NormalizarQuebras(string valor) => valor.Replace("\r\n", "\n").Replace("\r", "\n");

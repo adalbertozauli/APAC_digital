@@ -24,7 +24,7 @@ namespace Projeto_APAC
         private Button btnGerar = null!, btnLimpar = null!, btnAlternarTema = null!;
         private Panel headerPanel = null!;
         private Label lblTituloApp = null!, lblAvisoCid = null!, lblStatus = null!, lblAtalhos = null!;
-        private LinkLabel lnkPasta = null!;
+        private LinkLabel lnkPasta = null!, lnkMesmoPaciente = null!;
         private ListBox lstSugestoes = null!;
         private readonly ToolTip dicas = new ToolTip();
 
@@ -39,13 +39,16 @@ namespace Projeto_APAC
         private bool formatandoData;
         private bool preenchendoCid;              // evita reabrir sugestões ao preencher via código
         private bool inicializado;                // evita salvar preferências durante a montagem da tela
-        private TextBox? origemSugestoes;
-        private readonly List<(string Codigo, string Descricao, string Busca)> cids = new List<(string, string, string)>();
+        private bool alteradoDesdeUltimoLaudo;    // há dados digitados que ainda não viraram PDF
+        private bool limpandoFormulario;
+        private readonly List<(string Codigo, string Descricao, string Busca, string CodigoSemPonto, string DescricaoNorm)> cids = new List<(string, string, string, string, string)>();
 
         private Tema tema = Tema.Escuro;
 
-        private static readonly string PastaLaudos = Path.Combine(
+        internal static string PastaLaudos { get; set; } = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "APAC Digital", "Laudos");
+
+        internal static bool AbrirPdfAoGerar { get; set; } = true;
 
         private static readonly string ArquivoPreferencias = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "APAC Digital", "preferencias.txt");
@@ -132,10 +135,13 @@ namespace Projeto_APAC
 
             cbProfissional = CriarCombo("Médico(a) solicitante *", Margem, y, LarguraUtil, Array.Empty<string>());
             cbProfissional.SelectedIndexChanged += (s, e) => { AtualizarAcoesProfissional(); SalvarPreferencias(); };
-            int xLink = Margem + LarguraUtil;
-            lnkExcluirProf = CriarLinkAcao("Excluir", ref xLink, y, ExcluirProfissional);
-            lnkEditarProf = CriarLinkAcao("Editar", ref xLink, y, EditarProfissional);
-            lnkNovoProf = CriarLinkAcao("+ Cadastrar novo", ref xLink, y, CadastrarProfissional);
+            // Links na linha do rótulo, alinhados à direita (criados da esquerda p/ direita para a ordem do Tab)
+            var fonteLink = new Font("Segoe UI", 8.5F);
+            string[] textosLinks = { "+ Cadastrar novo", "Editar", "Excluir" };
+            int xLink = Margem + LarguraUtil - textosLinks.Sum(t => TextRenderer.MeasureText(t, fonteLink).Width) - 10 * (textosLinks.Length - 1);
+            lnkNovoProf = CriarLinkAcao(textosLinks[0], ref xLink, y, CadastrarProfissional);
+            lnkEditarProf = CriarLinkAcao(textosLinks[1], ref xLink, y, EditarProfissional);
+            lnkExcluirProf = CriarLinkAcao(textosLinks[2], ref xLink, y, ExcluirProfissional);
             PreencherProfissionais(LerPreferencia("profissional"));
             y += 72;
 
@@ -198,7 +204,7 @@ namespace Projeto_APAC
             };
             btnGerar.FlatAppearance.BorderSize = 0;
             btnGerar.Click += BtnGerar_Click;
-            dicas.SetToolTip(btnGerar, "Ctrl+Enter");
+            dicas.SetToolTip(btnGerar, "Ctrl+Enter  ·  Enter passa para o próximo campo");
             Controls.Add(btnGerar);
 
             btnLimpar = new Button {
@@ -224,8 +230,19 @@ namespace Projeto_APAC
             lnkPasta.LinkClicked += (s, e) => AbrirPastaLaudos();
             Controls.Add(lnkPasta);
 
+            lnkMesmoPaciente = new LinkLabel {
+                Text = "Novo laudo, mesmo paciente",
+                AutoSize = true,
+                Location = new Point(lnkPasta.Left + TextRenderer.MeasureText(lnkPasta.Text, lnkPasta.Font).Width + 14, y),
+                Font = new Font("Segoe UI", 9F),
+                LinkBehavior = LinkBehavior.HoverUnderline
+            };
+            lnkMesmoPaciente.LinkClicked += (s, e) => NovoLaudoMesmoPaciente();
+            dicas.SetToolTip(lnkMesmoPaciente, "Mantém profissional e paciente; limpa procedimento, CID e justificativa (Ctrl+N)");
+            Controls.Add(lnkMesmoPaciente);
+
             lblAtalhos = new Label {
-                Text = "Enter: próximo campo  ·  Ctrl+Enter: gerar PDF",
+                Text = "Ctrl+Enter: gerar PDF",
                 AutoSize = true,
                 Font = new Font("Segoe UI", 8F),
                 Tag = "mutado"
@@ -249,17 +266,15 @@ namespace Projeto_APAC
             y += 32;
         }
 
-        // Link pequeno alinhado à direita, na linha do rótulo (preenche da direita para a esquerda)
-        private LinkLabel CriarLinkAcao(string texto, ref int xDireita, int y, Action acao)
+        // Link pequeno na linha do rótulo; avança x para o próximo link
+        private LinkLabel CriarLinkAcao(string texto, ref int x, int y, Action acao)
         {
             var lnk = new LinkLabel {
                 Text = texto, AutoSize = true, Font = new Font("Segoe UI", 8.5F),
-                LinkBehavior = LinkBehavior.HoverUnderline, TabStop = false
+                LinkBehavior = LinkBehavior.HoverUnderline, TabStop = true
             };
-            int largura = TextRenderer.MeasureText(texto, lnk.Font).Width;
-            xDireita -= largura;
-            lnk.Location = new Point(xDireita, y);
-            xDireita -= 10;
+            lnk.Location = new Point(x, y);
+            x += TextRenderer.MeasureText(texto, lnk.Font).Width + 10;
             lnk.LinkClicked += (s, e) => acao();
             Controls.Add(lnk);
             return lnk;
@@ -294,7 +309,7 @@ namespace Projeto_APAC
             caixa.Controls.Add(tb);
             caixa.Click += (s, e) => tb.Focus();
             RegistrarCaixa(tb, caixa);
-            tb.TextChanged += (s, e) => caixa.Erro = false;
+            tb.TextChanged += (s, e) => { caixa.Erro = false; MarcarAlterado(); };
             return tb;
         }
 
@@ -317,8 +332,23 @@ namespace Projeto_APAC
             };
             caixa.Controls.Add(cb);
             RegistrarCaixa(cb, caixa);
-            cb.SelectedIndexChanged += (s, e) => caixa.Erro = false;
+            cb.SelectedIndexChanged += (s, e) => { caixa.Erro = false; if (cb != cbProfissional) MarcarAlterado(); };
             return cb;
+        }
+
+        private void MarcarAlterado()
+        {
+            if (inicializado && !limpandoFormulario) alteradoDesdeUltimoLaudo = true;
+        }
+
+        // Aviso ao fechar com dados que ainda não viraram laudo
+        protected override void OnFormClosing(FormClosingEventArgs e)
+        {
+            if (e.CloseReason == CloseReason.UserClosing && alteradoDesdeUltimoLaudo && AlgumCampoPreenchido() &&
+                MessageBox.Show("Há dados preenchidos que ainda não foram gerados em laudo.\n\nFechar mesmo assim?", "Fechar APAC Digital",
+                    MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2) != DialogResult.Yes)
+                e.Cancel = true;
+            base.OnFormClosing(e);
         }
 
         private void RegistrarCaixa(Control campo, CaixaCampo caixa)
@@ -556,6 +586,7 @@ namespace Projeto_APAC
         protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
         {
             if (keyData == (Keys.Control | Keys.Enter)) { btnGerar.PerformClick(); return true; }
+            if (keyData == (Keys.Control | Keys.N)) { NovoLaudoMesmoPaciente(); return true; }
 
             if (lstSugestoes.Visible)
             {
@@ -581,10 +612,13 @@ namespace Projeto_APAC
                 Control? ativo = ActiveControl;
                 bool multilinha = ativo is TextBox tb && tb.Multiline;
                 bool comboAberto = ativo is ComboBox cb && cb.DroppedDown;
-                if (!multilinha && !comboAberto && !(ativo is Button))
+                if (!multilinha && !comboAberto && !(ativo is Button) && !(ativo is LinkLabel))
                 {
                     if (ativo == txtCid) RealizarBuscaCid();
                     SelectNextControl(ativo, true, true, true, true);
+                    // Enter percorre só os campos; os links continuam acessíveis pelo Tab
+                    for (int i = 0; i < 5 && ActiveControl is LinkLabel; i++)
+                        SelectNextControl(ActiveControl, true, true, true, true);
                     return true;
                 }
             }
@@ -607,7 +641,7 @@ namespace Projeto_APAC
                     if (p.Length != 2 || string.IsNullOrWhiteSpace(p[0])) continue;
                     string codigo = p[0].Trim().ToUpperInvariant();
                     string descricao = p[1].Trim().ToUpperInvariant();
-                    cids.Add((codigo, descricao, Normalizar(codigo + " " + descricao)));
+                    cids.Add((codigo, descricao, Normalizar(codigo + " " + descricao), codigo.Replace(".", ""), Normalizar(descricao)));
                 }
             }
             catch (IOException) { /* sem lista: a busca simplesmente não sugere nada */ }
@@ -645,23 +679,27 @@ namespace Projeto_APAC
             var resultado = cids
                 .Select(c => new {
                     c,
-                    prioridade = c.Codigo.Replace(".", "").StartsWith(termoCodigo) ? 0
-                               : Normalizar(c.Descricao).StartsWith(termo) ? 1
-                               : c.Busca.Contains(termo) ? 2 : -1
+                    prioridade = c.CodigoSemPonto.StartsWith(termoCodigo, StringComparison.Ordinal) ? 0
+                               : c.DescricaoNorm.StartsWith(termo, StringComparison.Ordinal) ? 1
+                               : c.Busca.Contains(" " + termo, StringComparison.Ordinal) ? 2   // início de palavra
+                               : c.Busca.Contains(termo, StringComparison.Ordinal) ? 3 : -1
                 })
                 .Where(x => x.prioridade >= 0)
-                .OrderBy(x => x.prioridade).ThenBy(x => x.c.Codigo)
+                // Código/início do nome: categorias (3 caracteres) antes das subcategorias.
+                // Palavra no meio do nome: descrições mais curtas (mais diretas) primeiro.
+                .OrderBy(x => x.prioridade)
+                .ThenBy(x => x.prioridade <= 1 ? x.c.Codigo.Length : x.c.Descricao.Length)
+                .ThenBy(x => x.c.Codigo, StringComparer.Ordinal)
                 .Take(8)
                 .ToList();
 
             // CID exato digitado: não precisa da lista
-            if (resultado.Count == 0 || (origem == txtCid && resultado.Count == 1 && resultado[0].c.Codigo == termo))
+            if (resultado.Count == 0 || (origem == txtCid && resultado.Count == 1 && resultado[0].c.CodigoSemPonto == termoCodigo))
             {
                 OcultarSugestoes();
                 return;
             }
 
-            origemSugestoes = origem;
             lstSugestoes.BeginUpdate();
             lstSugestoes.Items.Clear();
             foreach (var r in resultado) lstSugestoes.Items.Add($"{r.c.Codigo}  —  {r.c.Descricao}");
@@ -680,12 +718,11 @@ namespace Projeto_APAC
         private void OcultarSugestoes()
         {
             lstSugestoes.Visible = false;
-            origemSugestoes = null;
         }
 
         private void SelecionarSugestao(int indice)
         {
-            if (lstSugestoes.Tag is not List<(string Codigo, string Descricao, string Busca)> lista || indice >= lista.Count) return;
+            if (lstSugestoes.Tag is not List<(string Codigo, string Descricao, string Busca, string CodigoSemPonto, string DescricaoNorm)> lista || indice >= lista.Count) return;
             var escolhido = lista[indice];
 
             preenchendoCid = true;
@@ -700,10 +737,11 @@ namespace Projeto_APAC
             txtObs.Focus();
         }
 
-        private string? BuscarDescricaoCid(string cid)
+        // Aceita o código com ou sem ponto (M545 ou M54.5); devolve o código no formato oficial
+        private (string Codigo, string Descricao)? BuscarCid(string cid)
         {
-            string alvo = cid.Trim().ToUpperInvariant();
-            foreach (var c in cids) if (c.Codigo == alvo) return c.Descricao;
+            string alvo = cid.Trim().ToUpperInvariant().Replace(".", "");
+            foreach (var c in cids) if (c.CodigoSemPonto == alvo) return (c.Codigo, c.Descricao);
             return null;
         }
 
@@ -711,11 +749,12 @@ namespace Projeto_APAC
         private void RealizarBuscaCid()
         {
             string cid = txtCid.Text.Trim().ToUpperInvariant();
-            string? descricao = cid == "" ? null : BuscarDescricaoCid(cid);
+            var encontrado = cid == "" ? null : BuscarCid(cid);
 
-            if (descricao != null)
+            if (encontrado is var (codigoOficial, descricao))
             {
                 preenchendoCid = true;
+                if (txtCid.Text != codigoOficial) txtCid.Text = codigoOficial;
                 txtDiagnostico.Text = descricao;
                 preenchendoCid = false;
                 diagnosticoAutomatico = descricao;
@@ -733,7 +772,7 @@ namespace Projeto_APAC
                 diagnosticoAutomatico = null;
             }
 
-            lblAvisoCid.Text = "CID fora da lista local — preencha o diagnóstico manualmente.";
+            lblAvisoCid.Text = "CID não encontrado na tabela CID-10 — confira o código ou preencha o diagnóstico.";
             lblAvisoCid.Visible = cid != "";
         }
 
@@ -789,21 +828,49 @@ namespace Projeto_APAC
 
         private void BtnLimpar_Click(object? sender, EventArgs e)
         {
-            if (AlgumCampoPreenchido() &&
+            // Só pergunta se há dados que ainda não viraram laudo
+            if (AlgumCampoPreenchido() && alteradoDesdeUltimoLaudo &&
                 MessageBox.Show("Apagar todos os campos preenchidos?", "Limpar formulário",
                     MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2) != DialogResult.Yes)
                 return;
 
+            limpandoFormulario = true;
+            txtNome.Clear(); txtDataNasc.Clear(); txtMae.Clear();
+            cbSexo.SelectedIndex = -1; cbRaca.SelectedIndex = -1;
+            limpandoFormulario = false;
+            LimparDadosClinicos();
+            MostrarStatus("", tema.Texto);
+            txtNome.Focus();
+        }
+
+        private void LimparDadosClinicos()
+        {
+            limpandoFormulario = true;
             preenchendoCid = true;
-            foreach (var t in new[] { txtNome, txtDataNasc, txtMae, txtProcedimento, txtCid, txtDiagnostico, txtObs }) t.Clear();
+            foreach (var t in new[] { txtProcedimento, txtCid, txtDiagnostico, txtObs }) t.Clear();
             preenchendoCid = false;
+            cbQuantidade.SelectedIndex = 0;
+            limpandoFormulario = false;
             diagnosticoAutomatico = null;
-            cbSexo.SelectedIndex = -1; cbRaca.SelectedIndex = -1; cbQuantidade.SelectedIndex = 0;
             foreach (var caixa in caixas.Values) caixa.Erro = false;
             lblAvisoCid.Visible = false;
             OcultarSugestoes();
-            MostrarStatus("", tema.Texto);
-            txtNome.Focus();
+            alteradoDesdeUltimoLaudo = false;
+        }
+
+        // Mantém profissional e paciente; limpa só o que muda de um laudo para outro
+        private void NovoLaudoMesmoPaciente()
+        {
+            bool clinicoPreenchido = new[] { txtProcedimento, txtCid, txtDiagnostico, txtObs }.Any(t => t.Text.Trim() != "");
+            if (clinicoPreenchido && alteradoDesdeUltimoLaudo &&
+                MessageBox.Show("Os dados clínicos atuais ainda não foram gerados em laudo.\n\nApagar procedimento, CID e justificativa mesmo assim?",
+                    "Novo laudo, mesmo paciente", MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2) != DialogResult.Yes)
+                return;
+            bool pacienteAlterado = alteradoDesdeUltimoLaudo && !clinicoPreenchido;
+            LimparDadosClinicos();
+            alteradoDesdeUltimoLaudo = pacienteAlterado;
+            MostrarStatus(txtNome.Text.Trim() == "" ? "" : "Novo laudo para " + txtNome.Text.Trim() + ".", tema.Texto);
+            txtProcedimento.Focus();
         }
 
         private void BtnGerar_Click(object? sender, EventArgs e)
@@ -875,22 +942,34 @@ namespace Projeto_APAC
             string nomeArquivo = CriarNomeArquivoSeguro(pac.NomePaciente);
             // Data e hora no nome evitam sobrescrever laudos anteriores (ou um PDF aberto no leitor)
             string outPath = Path.Combine(PastaLaudos, $"Laudo_{nomeArquivo}_{DateTime.Now:yyyy-MM-dd_HHmmss}.pdf");
+            List<string> avisos;
             try
             {
                 Cursor = Cursors.WaitCursor;
-                var avisos = new GeradorPdfService().PreencherLaudo(pac, Path.Combine(pasta, "Templates", "Laudo de APAC - Modelo.pdf"), outPath);
-                Cursor = Cursors.Default;
-                MostrarStatus("✓ Laudo salvo: " + Path.GetFileName(outPath), tema.Ok);
-                Process.Start(new ProcessStartInfo(outPath) { UseShellExecute = true });
-                if (avisos.Count > 0)
-                    MessageBox.Show(string.Join("\n\n", avisos), "Atenção", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                avisos = new GeradorPdfService().PreencherLaudo(pac, Path.Combine(pasta, "Templates", "Laudo de APAC - Modelo.pdf"), outPath);
             }
             catch (Exception ex)
             {
-                Cursor = Cursors.Default;
                 MostrarStatus("Não foi possível gerar o laudo.", tema.Erro);
                 MessageBox.Show("Erro ao gerar o laudo:\n\n" + ex.Message, "Erro", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
             }
+            finally { Cursor = Cursors.Default; }
+
+            alteradoDesdeUltimoLaudo = false;
+            MostrarStatus("✓ Laudo salvo: " + Path.GetFileName(outPath), tema.Ok);
+            try
+            {
+                if (AbrirPdfAoGerar) Process.Start(new ProcessStartInfo(outPath) { UseShellExecute = true });
+            }
+            catch (Exception ex)
+            {
+                // O laudo foi salvo; só não há leitor de PDF disponível para abri-lo
+                MessageBox.Show("O laudo foi salvo, mas não foi possível abri-lo automaticamente:\n\n" + ex.Message +
+                    "\n\nUse \"Abrir pasta dos laudos\" para encontrá-lo.", "Laudo salvo", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+            if (avisos.Count > 0)
+                MessageBox.Show(string.Join("\n\n", avisos), "Atenção", MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
 
         private void AbrirPastaLaudos()
