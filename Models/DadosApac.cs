@@ -12,5 +12,7 @@ namespace Projeto_APAC.Models
         public string? DescricaoDiagnostico { get; set; }
         public string? Cid10Principal { get; set; }
         public string? Observacoes { get; set; }
+        public string? NomeProfissional { get; set; }
+        public string? CnsProfissional { get; set; }
     }
 }

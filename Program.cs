@@ -18,7 +18,9 @@ namespace Projeto_APAC
     {
         // ---------- Controles ----------
         private TextBox txtNome = null!, txtDataNasc = null!, txtMae = null!, txtCid = null!, txtDiagnostico = null!, txtProcedimento = null!, txtObs = null!;
-        private ComboBox cbSexo = null!, cbRaca = null!, cbQuantidade = null!;
+        private ComboBox cbSexo = null!, cbRaca = null!, cbQuantidade = null!, cbProfissional = null!;
+        private LinkLabel lnkNovoProf = null!, lnkEditarProf = null!, lnkExcluirProf = null!;
+        private List<Profissional> profissionais = new List<Profissional>();
         private Button btnGerar = null!, btnLimpar = null!, btnAlternarTema = null!;
         private Panel headerPanel = null!;
         private Label lblTituloApp = null!, lblAvisoCid = null!, lblStatus = null!, lblAtalhos = null!;
@@ -36,6 +38,7 @@ namespace Projeto_APAC
         private string? diagnosticoAutomatico;   // último diagnóstico preenchido pela busca de CID
         private bool formatandoData;
         private bool preenchendoCid;              // evita reabrir sugestões ao preencher via código
+        private bool inicializado;                // evita salvar preferências durante a montagem da tela
         private TextBox? origemSugestoes;
         private readonly List<(string Codigo, string Descricao, string Busca)> cids = new List<(string, string, string)>();
 
@@ -54,6 +57,7 @@ namespace Projeto_APAC
         {
             isDarkMode = CarregarTemaPreferido();
             CarregarCids();
+            profissionais = RepositorioProfissionais.Carregar();
             ConfigurarJanela();
             SuspendLayout();
             AutoScaleDimensions = new SizeF(96F, 96F);
@@ -62,6 +66,7 @@ namespace Projeto_APAC
             ResumeLayout(false);
             AplicarTema();
             MigrarLaudosAntigos();
+            inicializado = true;
             Shown += (s, e) => { AplicarTema(); txtNome.Focus(); };
         }
 
@@ -101,7 +106,7 @@ namespace Projeto_APAC
                 TabStop = false
             };
             btnAlternarTema.FlatAppearance.BorderSize = 0;
-            btnAlternarTema.Click += (s, e) => { isDarkMode = !isDarkMode; SalvarTemaPreferido(); AplicarTema(); };
+            btnAlternarTema.Click += (s, e) => { isDarkMode = !isDarkMode; temaEscolhido = true; SalvarPreferencias(); AplicarTema(); };
             dicas.SetToolTip(btnAlternarTema, "Alternar tema claro / escuro");
             headerPanel.Controls.Add(lblTituloApp);
             headerPanel.Controls.Add(btnAlternarTema);
@@ -123,6 +128,17 @@ namespace Projeto_APAC
             Controls.Add(lstSugestoes);
 
             int y = 76;
+            CriarSecao("PROFISSIONAL SOLICITANTE", ref y);
+
+            cbProfissional = CriarCombo("Médico(a) solicitante *", Margem, y, LarguraUtil, Array.Empty<string>());
+            cbProfissional.SelectedIndexChanged += (s, e) => { AtualizarAcoesProfissional(); SalvarPreferencias(); };
+            int xLink = Margem + LarguraUtil;
+            lnkExcluirProf = CriarLinkAcao("Excluir", ref xLink, y, ExcluirProfissional);
+            lnkEditarProf = CriarLinkAcao("Editar", ref xLink, y, EditarProfissional);
+            lnkNovoProf = CriarLinkAcao("+ Cadastrar novo", ref xLink, y, CadastrarProfissional);
+            PreencherProfissionais(LerPreferencia("profissional"));
+            y += 72;
+
             CriarSecao("DADOS DO PACIENTE", ref y);
 
             txtNome = CriarTexto("Nome completo *", Margem, y, LarguraUtil, "Ex: JOÃO DA SILVA");
@@ -233,6 +249,22 @@ namespace Projeto_APAC
             y += 32;
         }
 
+        // Link pequeno alinhado à direita, na linha do rótulo (preenche da direita para a esquerda)
+        private LinkLabel CriarLinkAcao(string texto, ref int xDireita, int y, Action acao)
+        {
+            var lnk = new LinkLabel {
+                Text = texto, AutoSize = true, Font = new Font("Segoe UI", 8.5F),
+                LinkBehavior = LinkBehavior.HoverUnderline, TabStop = false
+            };
+            int largura = TextRenderer.MeasureText(texto, lnk.Font).Width;
+            xDireita -= largura;
+            lnk.Location = new Point(xDireita, y);
+            xDireita -= 10;
+            lnk.LinkClicked += (s, e) => acao();
+            Controls.Add(lnk);
+            return lnk;
+        }
+
         private Label CriarRotulo(string texto, int x, int y)
         {
             var lbl = new Label { Text = texto, Location = new Point(x - 2, y), AutoSize = true, Font = new Font("Segoe UI", 8.5F) };
@@ -301,7 +333,7 @@ namespace Projeto_APAC
         //  Tema
         // =====================================================================
 
-        private sealed class Tema
+        internal sealed class Tema
         {
             public Color Fundo, Cabecalho, TituloApp, Campo, Borda, Texto, Mutado, Destaque, Erro, Ok, Aviso, Divisor, BotaoSecundario;
             public static readonly Tema Escuro = new Tema {
@@ -367,9 +399,13 @@ namespace Projeto_APAC
             btnLimpar.FlatAppearance.BorderColor = tema.Borda;
             btnLimpar.FlatAppearance.MouseOverBackColor = isDarkMode ? Color.FromArgb(60, 60, 64) : Color.FromArgb(235, 238, 242);
 
-            lnkPasta.LinkColor = tema.Destaque;
-            lnkPasta.ActiveLinkColor = tema.Destaque;
-            lnkPasta.VisitedLinkColor = tema.Destaque;
+            foreach (var lnk in Controls.OfType<LinkLabel>())
+            {
+                lnk.LinkColor = tema.Destaque;
+                lnk.ActiveLinkColor = tema.Destaque;
+                lnk.VisitedLinkColor = tema.Destaque;
+                lnk.DisabledLinkColor = tema.Mutado;
+            }
 
             AplicarBarraDeTitulo();
 
@@ -403,15 +439,24 @@ namespace Projeto_APAC
             AplicarBarraDeTitulo();
         }
 
-        private static bool CarregarTemaPreferido()
+        // Preferências simples "chave=valor" (tema e último profissional escolhido)
+        private static string? LerPreferencia(string chave)
         {
             try
             {
-                if (File.Exists(ArquivoPreferencias))
-                {
-                    string? linha = File.ReadLines(ArquivoPreferencias).FirstOrDefault(l => l.StartsWith("tema="));
-                    if (linha != null) return linha.Trim() == "tema=escuro";
-                }
+                if (!File.Exists(ArquivoPreferencias)) return null;
+                string? linha = File.ReadLines(ArquivoPreferencias).FirstOrDefault(l => l.StartsWith(chave + "="));
+                return linha?.Substring(chave.Length + 1).Trim();
+            }
+            catch (Exception) { return null; }
+        }
+
+        private static bool CarregarTemaPreferido()
+        {
+            string? salvo = LerPreferencia("tema");
+            if (salvo != null) return salvo == "escuro";
+            try
+            {
                 // Sem preferência salva: segue o tema do Windows
                 object? claro = Registry.GetValue(@"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Themes\Personalize", "AppsUseLightTheme", 1);
                 return claro is int v && v == 0;
@@ -419,14 +464,89 @@ namespace Projeto_APAC
             catch (Exception) { return true; }
         }
 
-        private void SalvarTemaPreferido()
+        private bool temaEscolhido = LerPreferencia("tema") != null;
+
+        private void SalvarPreferencias()
         {
+            if (!inicializado) return;
             try
             {
+                var linhas = new List<string>();
+                if (temaEscolhido) linhas.Add("tema=" + (isDarkMode ? "escuro" : "claro"));
+                if (cbProfissional.SelectedItem is Profissional p) linhas.Add("profissional=" + p.Cns);
                 Directory.CreateDirectory(Path.GetDirectoryName(ArquivoPreferencias)!);
-                File.WriteAllText(ArquivoPreferencias, "tema=" + (isDarkMode ? "escuro" : "claro"));
+                File.WriteAllLines(ArquivoPreferencias, linhas);
             }
             catch (Exception) { /* preferência é opcional */ }
+        }
+
+        // =====================================================================
+        //  Profissionais
+        // =====================================================================
+
+        private void PreencherProfissionais(string? cnsSelecionado)
+        {
+            cbProfissional.BeginUpdate();
+            cbProfissional.Items.Clear();
+            foreach (var p in profissionais.OrderBy(p => p.Nome)) cbProfissional.Items.Add(p);
+            cbProfissional.EndUpdate();
+
+            int indice = cbProfissional.Items.Cast<Profissional>().ToList().FindIndex(p => p.Cns == cnsSelecionado);
+            cbProfissional.SelectedIndex = indice >= 0 ? indice : (cbProfissional.Items.Count > 0 ? 0 : -1);
+            AtualizarAcoesProfissional();
+        }
+
+        private void AtualizarAcoesProfissional()
+        {
+            bool temSelecionado = cbProfissional.SelectedItem is Profissional;
+            lnkEditarProf.Enabled = temSelecionado;
+            lnkExcluirProf.Enabled = temSelecionado;
+        }
+
+        private bool PersistirProfissionais()
+        {
+            try { RepositorioProfissionais.Salvar(profissionais); return true; }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Não foi possível salvar o cadastro de profissionais:\n\n" + ex.Message, "Erro", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return false;
+            }
+        }
+
+        private void CadastrarProfissional()
+        {
+            using var dlg = new FormProfissional(tema, profissionais);
+            if (dlg.ShowDialog(this) != DialogResult.OK || dlg.Resultado == null) return;
+            profissionais.Add(dlg.Resultado);
+            if (!PersistirProfissionais()) { profissionais.Remove(dlg.Resultado); return; }
+            PreencherProfissionais(dlg.Resultado.Cns);
+            MostrarStatus("✓ Profissional cadastrado: " + dlg.Resultado.Nome, tema.Ok);
+        }
+
+        private void EditarProfissional()
+        {
+            if (cbProfissional.SelectedItem is not Profissional atual) return;
+            using var dlg = new FormProfissional(tema, profissionais.Where(p => p != atual).ToList(), atual);
+            if (dlg.ShowDialog(this) != DialogResult.OK || dlg.Resultado == null) return;
+            string nomeAntigo = atual.Nome, cnsAntigo = atual.Cns;
+            atual.Nome = dlg.Resultado.Nome;
+            atual.Cns = dlg.Resultado.Cns;
+            if (!PersistirProfissionais()) { atual.Nome = nomeAntigo; atual.Cns = cnsAntigo; return; }
+            PreencherProfissionais(atual.Cns);
+            MostrarStatus("✓ Profissional atualizado.", tema.Ok);
+        }
+
+        private void ExcluirProfissional()
+        {
+            if (cbProfissional.SelectedItem is not Profissional atual) return;
+            if (MessageBox.Show($"Excluir {atual.Nome} da lista de profissionais?", "Excluir profissional",
+                    MessageBoxButtons.YesNo, MessageBoxIcon.Question, MessageBoxDefaultButton.Button2) != DialogResult.Yes)
+                return;
+            int pos = profissionais.IndexOf(atual);
+            profissionais.Remove(atual);
+            if (!PersistirProfissionais()) { profissionais.Insert(pos, atual); return; }
+            PreencherProfissionais(null);
+            MostrarStatus("Profissional excluído.", tema.Texto);
         }
 
         // =====================================================================
@@ -700,6 +820,14 @@ namespace Projeto_APAC
                 return;
             }
 
+            if (cbProfissional.SelectedItem is not Profissional profissional)
+            {
+                caixas[cbProfissional].Erro = true;
+                MostrarStatus("Cadastre ou escolha o(a) médico(a) solicitante.", tema.Erro);
+                cbProfissional.Focus();
+                return;
+            }
+
             string dataNasc = txtDataNasc.Text.Trim();
             if (dataNasc != "" && !DataValida(dataNasc, out _))
             {
@@ -738,7 +866,9 @@ namespace Projeto_APAC
                 Cid10Principal = txtCid.Text.Trim().ToUpper(),
                 Observacoes = txtObs.Text.Trim().ToUpper(),
                 Quantidade = cbQuantidade.Text,
-                RacaCor = cbRaca.Text
+                RacaCor = cbRaca.Text,
+                NomeProfissional = profissional.Nome,
+                CnsProfissional = profissional.Cns
             };
 
             string pasta = AppDomain.CurrentDomain.BaseDirectory;

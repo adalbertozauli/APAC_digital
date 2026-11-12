@@ -23,6 +23,13 @@ Os PDFs gerados sao salvos em `Documentos\APAC Digital\Laudos`, com data e hora 
 (ex.: `Laudo_JOAO_DA_SILVA_2026-11-12_143005.pdf`). Essa pasta nao e apagada ao desinstalar o app.
 Laudos de versoes antigas (pasta `Saida` dentro do programa) sao movidos para la ao abrir o app.
 
+## Profissionais solicitantes
+
+No topo da tela, escolha o(a) medico(a) solicitante. Use "+ Cadastrar novo" para incluir outro
+profissional (nome completo e CNS de 15 digitos, validado), ou "Editar"/"Excluir".
+O cadastro fica em `%APPDATA%\APAC Digital\profissionais.json` e o ultimo profissional escolhido
+e lembrado ao abrir o app.
+
 ## Como publicar
 
 ```powershell

@@ -38,11 +38,11 @@ namespace Projeto_APAC.Services
 
                     // --- DADOS FIXOS ---
                     SetCampo(campos, "txtUnidade", "ESF SÃO CARLOS 2", 9);
-                    SetCampo(campos, "txtMedico", "DR. ADALBERTO ZAULI DOS SANTOS", 9);
-                    SetCampo(campos, "txtCnsX", "X", 10);
+                    SetCampo(campos, "txtMedico", dados.NomeProfissional, 9);
 
                     // --- CAMPO 44: CNS PROFISSIONAL (c1 a c15) ---
-                    string cnsVal = "703200673914795";
+                    string cnsVal = dados.CnsProfissional ?? "";
+                    if (cnsVal != "") SetCampo(campos, "txtCnsX", "X", 10);
                     for (int i = 0; i < 15; i++)
                     {
                         string nomeCns = $"c{i + 1}";
