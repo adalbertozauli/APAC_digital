@@ -104,7 +104,7 @@ namespace Projeto_APAC
                 CorFundo = tema.Campo, CorBorda = tema.Borda, CorFoco = tema.Destaque, CorErro = tema.Erro, BackColor = tema.Campo
             };
             c.Controls.Add(tb);
-            c.Click += (s, e) => tb.Focus();
+            c.Click += (s, e) => tb.Select();
             tb.Enter += (s, e) => c.Focado = true;
             tb.Leave += (s, e) => c.Focado = false;
             tb.TextChanged += (s, e) => { c.Erro = false; lblErro.Text = ""; };
@@ -128,18 +128,18 @@ namespace Projeto_APAC
 
             if (nome.Length < 5 || !nome.Contains(' '))
             {
-                caixaNome.Erro = true; lblErro.Text = "Informe o nome completo."; txtNome.Focus(); return;
+                caixaNome.Erro = true; lblErro.Text = "Informe o nome completo."; txtNome.Select(); return;
             }
             if (!Profissional.CnsValido(cns))
             {
                 caixaCns.Erro = true;
                 lblErro.Text = cns.Length != 15 ? "O CNS deve ter 15 dígitos." : "CNS inválido. Confira os números.";
-                txtCns.Focus(); return;
+                txtCns.Select(); return;
             }
             var repetido = outros.FirstOrDefault(p => p.Cns == cns);
             if (repetido != null)
             {
-                caixaCns.Erro = true; lblErro.Text = "Este CNS já está cadastrado para " + repetido.Nome + "."; txtCns.Focus(); return;
+                caixaCns.Erro = true; lblErro.Text = "Este CNS já está cadastrado para " + repetido.Nome + "."; txtCns.Select(); return;
             }
 
             Resultado = new Profissional { Nome = nome, Cns = cns };

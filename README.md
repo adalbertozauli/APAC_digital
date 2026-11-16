@@ -39,7 +39,11 @@ e lembrado ao abrir o app.
 ## Tabela CID-10
 
 `cids.txt` contem a tabela CID-10 oficial do DATASUS (categorias e subcategorias, cerca de 14,5 mil codigos),
-convertida de `CID10CSV.zip` (http://www2.datasus.gov.br/cid10/V2008/) para UTF-8 no formato `CODIGO,DESCRICAO`.
+convertida de `CID10CSV.zip` (http://www2.datasus.gov.br/cid10/V2008/) para UTF-8 no formato `CODIGO,DESCRICAO`,
+mais os codigos incluidos depois de 2008 que constam na tabela de CID do SIGTAP (`tb_cid.txt` da Tabela Unificada,
+competencia 11/2026, ftp://ftp2.datasus.gov.br/pub/sistemas/tup/downloads/) - por exemplo Zika (A92.5, P35.4),
+estadios da doenca renal cronica (N18.2 a N18.5) e condicoes pos-COVID-19 (U09.9, U10.9). No SUS, a COVID-19 e
+codificada como B34.2 (o SIGTAP nao traz U07.1/U07.2).
 O CID pode ser digitado com ou sem ponto (`M545` ou `M54.5`), ou buscado pelo nome no campo Diagnostico.
 
 ## Testes

@@ -70,7 +70,7 @@ namespace Projeto_APAC
             AplicarTema();
             MigrarLaudosAntigos();
             inicializado = true;
-            Shown += (s, e) => { AplicarTema(); txtNome.Focus(); };
+            Shown += (s, e) => { AplicarTema(); txtNome.Select(); };
         }
 
         // =====================================================================
@@ -307,7 +307,7 @@ namespace Projeto_APAC
                 Padding = multilinha ? new Padding(6, 5, 2, 4) : new Padding(8, 6, 8, 2)
             };
             caixa.Controls.Add(tb);
-            caixa.Click += (s, e) => tb.Focus();
+            caixa.Click += (s, e) => tb.Select();
             RegistrarCaixa(tb, caixa);
             tb.TextChanged += (s, e) => { caixa.Erro = false; MarcarAlterado(); };
             return tb;
@@ -659,7 +659,7 @@ namespace Projeto_APAC
         private void ConfigurarBuscaCid(TextBox origem)
         {
             origem.TextChanged += (s, e) => {
-                if (preenchendoCid || !origem.Focused) return;
+                if (preenchendoCid || ActiveControl != origem) return;
                 if (origem == txtCid) lblAvisoCid.Visible = false;
                 MostrarSugestoes(origem);
             };
@@ -734,7 +734,7 @@ namespace Projeto_APAC
             caixas[txtCid].Erro = false;
 
             OcultarSugestoes();
-            txtObs.Focus();
+            txtObs.Select();
         }
 
         // Aceita o código com ou sem ponto (M545 ou M54.5); devolve o código no formato oficial
@@ -840,7 +840,7 @@ namespace Projeto_APAC
             limpandoFormulario = false;
             LimparDadosClinicos();
             MostrarStatus("", tema.Texto);
-            txtNome.Focus();
+            txtNome.Select();
         }
 
         private void LimparDadosClinicos()
@@ -870,20 +870,20 @@ namespace Projeto_APAC
             LimparDadosClinicos();
             alteradoDesdeUltimoLaudo = pacienteAlterado;
             MostrarStatus(txtNome.Text.Trim() == "" ? "" : "Novo laudo para " + txtNome.Text.Trim() + ".", tema.Texto);
-            txtProcedimento.Focus();
+            txtProcedimento.Select();
         }
 
         private void BtnGerar_Click(object? sender, EventArgs e)
         {
             OcultarSugestoes();
-            if (txtCid.Focused || ActiveControl == btnGerar) RealizarBuscaCid();
+            if (ActiveControl == txtCid || ActiveControl == btnGerar) RealizarBuscaCid();
 
             // Nome é obrigatório (usado no nome do arquivo)
             if (txtNome.Text.Trim() == "")
             {
                 caixas[txtNome].Erro = true;
                 MostrarStatus("Informe o nome do paciente.", tema.Erro);
-                txtNome.Focus();
+                txtNome.Select();
                 return;
             }
 
@@ -891,7 +891,7 @@ namespace Projeto_APAC
             {
                 caixas[cbProfissional].Erro = true;
                 MostrarStatus("Cadastre ou escolha o(a) médico(a) solicitante.", tema.Erro);
-                cbProfissional.Focus();
+                cbProfissional.Select();
                 return;
             }
 
@@ -900,7 +900,7 @@ namespace Projeto_APAC
             {
                 caixas[txtDataNasc].Erro = true;
                 MostrarStatus("Data de nascimento inválida. Use o formato dd/mm/aaaa.", tema.Erro);
-                txtDataNasc.Focus();
+                txtDataNasc.Select();
                 return;
             }
 
@@ -920,7 +920,7 @@ namespace Projeto_APAC
                     "Os seguintes campos obrigatórios estão em branco:\n\n• " + string.Join("\n• ", faltando.Select(f => f.Nome)) +
                     "\n\nGerar o laudo mesmo assim?",
                     "Campos em branco", MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2);
-                if (resp != DialogResult.Yes) { faltando[0].Campo.Focus(); return; }
+                if (resp != DialogResult.Yes) { faltando[0].Campo.Select(); return; }
             }
 
             var pac = new DadosApac {

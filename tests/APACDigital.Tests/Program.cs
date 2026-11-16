@@ -176,6 +176,14 @@ static class Testes
     const int WM_KEYDOWN = 0x100, WM_KEYUP = 0x101, WM_CHAR = 0x102;
 
     // Envia teclas ao controle com foco pela fila de mensagens (não depende da janela estar em primeiro plano)
+    static Form? formAtual;
+
+    static IntPtr Alvo() => formAtual?.ActiveControl is Control c && c.IsHandleCreated ? c.Handle : GetFocus();
+
+    static void Focar(Control c) { c.Select(); Pump(); }
+
+    static bool Ativo(Control c) => formAtual?.ActiveControl == c;
+
     static void Teclar(string seq)
     {
         foreach (Match m in Regex.Matches(seq, @"\{(\w+)(?: (\d+))?\}|.", RegexOptions.Singleline))
@@ -189,14 +197,14 @@ static class Testes
                 };
                 for (int i = 0; i < n; i++)
                 {
-                    IntPtr h = GetFocus();
+                    IntPtr h = Alvo();
                     if (k == Keys.Back) { PostMessage(h, WM_CHAR, (IntPtr)8, IntPtr.Zero); Pump(); continue; }
                     PostMessage(h, WM_KEYDOWN, (IntPtr)k, IntPtr.Zero);
                     PostMessage(h, WM_KEYUP, (IntPtr)k, IntPtr.Zero);
                     Pump();
                 }
             }
-            else { PostMessage(GetFocus(), WM_CHAR, (IntPtr)m.Value[0], IntPtr.Zero); Application.DoEvents(); }
+            else { PostMessage(Alvo(), WM_CHAR, (IntPtr)m.Value[0], IntPtr.Zero); Application.DoEvents(); }
         }
         Pump();
     }
@@ -221,6 +229,7 @@ static class Testes
     static void TestarUi()
     {
         var form = new FormPrincipal();
+        formAtual = form;
         form.Show(); form.Activate(); Pump();
 
         var cid = Campo<TextBox>(form, "txtCid");
@@ -234,19 +243,19 @@ static class Testes
         var cids = (System.Collections.ICollection)Campo<object>(form, "cids");
         Check(cids.Count > 14000, $"tabela CID-10 completa carregada ({cids.Count} códigos)");
         Check(cid.Text == "" && cid.PlaceholderText != "", "CID começa vazio, com placeholder nativo");
-        Check(nome.Focused, "foco inicial no nome");
+        Check(Ativo(nome), "foco inicial no nome");
 
         Campo<Button>(form, "btnGerar").PerformClick(); Pump();
         Check(status.Text.Contains("nome"), $"gerar sem nome mostra erro: [{status.Text}]");
 
-        nome.Focus(); Pump();
+        Focar(nome);
         Teclar("maria souza");
         Check(nome.Text == "MARIA SOUZA", $"nome em maiúsculas ao digitar: [{nome.Text}]");
         Teclar("{ENTER}");
-        Check(data.Focused, "Enter vai do nome para a data");
+        Check(Ativo(data), "Enter vai do nome para a data");
 
         // Data
-        data.Focus(); Pump();
+        Focar(data);
         Teclar("05031960");
         Check(data.Text == "05/03/1960", $"data formatada ao digitar: [{data.Text}]");
         Teclar("{BACKSPACE 5}");
@@ -257,44 +266,52 @@ static class Testes
         Check(data.Text == "12", $"barra digitada à mão não duplica: [{data.Text}]");
 
         // CID -> diagnóstico
-        cid.Focus(); Pump(); cid.SelectAll(); Teclar("I10");
-        nome.Focus(); Pump();
+        Focar(cid); cid.SelectAll(); Teclar("I10");
+        Focar(nome);
         Check(diag.Text.StartsWith("HIPERTENSÃO"), $"CID I10 preenche diagnóstico: [{diag.Text}]");
-        cid.Focus(); Pump(); cid.SelectAll(); Teclar("A007");          // código inexistente (A00 só tem .0, .1 e .9)
-        nome.Focus(); Pump();
+        Focar(cid); cid.SelectAll(); Teclar("A007");          // código inexistente (A00 só tem .0, .1 e .9)
+        Focar(nome);
         Check(diag.Text == "", $"CID inexistente limpa diagnóstico automático: [{diag.Text}]");
         Check(aviso.Visible, "aviso de CID não encontrado aparece");
 
-        cid.Focus(); Pump(); cid.SelectAll(); Teclar("m545");
-        nome.Focus(); Pump();
+        Focar(cid); cid.SelectAll(); Teclar("m545");
+        Focar(nome);
         Check(cid.Text == "M54.5" && diag.Text == "DOR LOMBAR BAIXA", $"CID sem ponto é reconhecido e formatado: [{cid.Text}] [{diag.Text}]");
 
+        // Códigos incluídos após 2008 (tabela SIGTAP)
+        foreach (var (codigo, inicio) in new[] { ("n183", "DOENÇA RENAL CRÔNICA, ESTÁDIO 3"), ("U099", "CONDIÇÃO DE SAÚDE POSTERIOR À COVID-19"), ("A925", "DOENÇA PELO VÍRUS ZIKA") })
+        {
+            Focar(cid); cid.SelectAll(); Teclar(codigo);
+            Focar(nome);
+            Check(diag.Text.StartsWith(inicio), $"CID recente {cid.Text} reconhecido: [{diag.Text}]");
+        }
+
         // Busca por nome, sem acento, com Enter
-        cid.Focus(); Pump(); cid.SelectAll(); Teclar("{DEL}");
-        diag.Focus(); Pump(); diag.SelectAll(); Teclar("{DEL}"); Teclar("hipertensao");
+        Focar(cid); cid.SelectAll(); Teclar("{DEL}");
+        Focar(diag); diag.SelectAll(); Teclar("{DEL}"); Teclar("hipertensao");
         Check(lista.Visible && lista.Items.Count >= 1, $"busca por nome mostra sugestões ({lista.Items.Count})");
         Teclar("{ENTER}");
         Check(cid.Text == "I10" && diag.Text.StartsWith("HIPERTENSÃO") && !lista.Visible, $"Enter escolhe sugestão: [{cid.Text}] [{diag.Text}]");
 
         // Palavra no meio do nome: a descrição mais direta vem primeiro
-        cid.Focus(); Pump(); cid.SelectAll(); Teclar("{DEL}");
-        diag.Focus(); Pump(); diag.SelectAll(); Teclar("{DEL}"); Teclar("lombar");
+        Focar(cid); cid.SelectAll(); Teclar("{DEL}");
+        Focar(diag); diag.SelectAll(); Teclar("{DEL}"); Teclar("lombar");
         Check(lista.Items.Count > 0 && lista.Items[0]!.ToString()!.StartsWith("M54.5"), $"'lombar' sugere primeiro DOR LOMBAR BAIXA: [{(lista.Items.Count > 0 ? lista.Items[0] : "")}]");
         Teclar("{ESC}");
         diag.SelectAll(); Teclar("{DEL}");
 
         // Busca por código parcial
-        cid.Focus(); Pump(); cid.SelectAll(); Teclar("M5");
+        Focar(cid); cid.SelectAll(); Teclar("M5");
         Check(lista.Visible && lista.Items.Cast<object>().All(i => i.ToString()!.StartsWith("M5")), $"código parcial sugere M5x ({lista.Items.Count})");
         Teclar("{DOWN}{ENTER}");
         Check(cid.Text == "M51", $"seta para baixo + Enter escolhe o 2º: [{cid.Text}]");
         Teclar("{ESC}");
-        diag.Focus(); Pump(); diag.SelectAll(); Teclar("{DEL}");
+        Focar(diag); diag.SelectAll(); Teclar("{DEL}");
 
         // Diagnóstico digitado à mão é mantido
-        diag.Focus(); Pump(); Teclar("DIAG MANUAL");
-        cid.Focus(); Pump(); cid.SelectAll(); Teclar("A008");
-        nome.Focus(); Pump();
+        Focar(diag); Teclar("DIAG MANUAL");
+        Focar(cid); cid.SelectAll(); Teclar("A008");
+        Focar(nome);
         Check(diag.Text == "DIAG MANUAL", $"diagnóstico manual mantido: [{diag.Text}]");
 
         // ---- Profissionais ----
@@ -331,13 +348,13 @@ static class Testes
               && links[0].Left < links[1].Left && links[1].Left < links[2].Left, "links Cadastrar/Editar/Excluir acessíveis pelo Tab, na ordem visual");
 
         // ---- Gerar laudo completo, depois novo laudo para o mesmo paciente ----
-        nome.Focus(); Pump(); nome.SelectAll(); Teclar("JOSE TESTE");
-        data.Focus(); Pump(); data.SelectAll(); Teclar("01021970");
+        Focar(nome); nome.SelectAll(); Teclar("JOSE TESTE");
+        Focar(data); data.SelectAll(); Teclar("01021970");
         Campo<ComboBox>(form, "cbSexo").SelectedIndex = 0;
         var mae = Campo<TextBox>(form, "txtMae"); mae.Text = "ANA TESTE";
         var proc = Campo<TextBox>(form, "txtProcedimento"); proc.Text = "TC DE CRANIO";
         var obs = Campo<TextBox>(form, "txtObs"); obs.Text = "CEFALEIA";
-        cid.Focus(); Pump(); cid.SelectAll(); Teclar("G43"); nome.Focus(); Pump();
+        Focar(cid); cid.SelectAll(); Teclar("G43"); Focar(nome);
         Check(Campo<bool>(form, "alteradoDesdeUltimoLaudo"), "dados digitados ficam marcados como não gerados");
 
         int antes = Directory.Exists(FormPrincipal.PastaLaudos) ? Directory.GetFiles(FormPrincipal.PastaLaudos).Length : 0;
@@ -349,7 +366,7 @@ static class Testes
         Chamar(form, "NovoLaudoMesmoPaciente"); Pump();
         Check(nome.Text == "JOSE TESTE" && data.Text == "01/02/1970" && mae.Text == "ANA TESTE", "novo laudo mantém os dados do paciente");
         Check(proc.Text == "" && cid.Text == "" && diag.Text == "" && obs.Text == "", "novo laudo limpa procedimento, CID, diagnóstico e justificativa");
-        Check(proc.Focused, "novo laudo põe o foco no procedimento");
+        Check(Ativo(proc), "novo laudo põe o foco no procedimento");
 
         Definir(form, "alteradoDesdeUltimoLaudo", false);   // evita o aviso de fechar
         form.Dispose();
@@ -362,13 +379,14 @@ static class Testes
     static void Telas()
     {
         var form = new FormPrincipal();
+        formAtual = form;
         form.Show(); Pump();
         Capturar(form, "tela_1");
         Campo<Button>(form, "btnAlternarTema").PerformClick(); Pump();
         Capturar(form, "tela_2");
         Campo<Button>(form, "btnAlternarTema").PerformClick(); Pump();
         var diag = Campo<TextBox>(form, "txtDiagnostico");
-        diag.Focus(); Pump(); Teclar("lombar");
+        Focar(diag); Teclar("lombar");
         Capturar(form, "tela_sugestoes");
         Teclar("{ESC}");
         Definir(form, "alteradoDesdeUltimoLaudo", false);
