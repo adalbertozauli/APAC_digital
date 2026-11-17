@@ -14,24 +14,22 @@ using Projeto_APAC.Services;
 
 namespace Projeto_APAC
 {
-    public class FormPrincipal : Form
+    public class FormPrincipal : Form, IFundoPintavel
     {
         // ---------- Controles ----------
         private TextBox txtNome = null!, txtDataNasc = null!, txtMae = null!, txtCid = null!, txtDiagnostico = null!, txtProcedimento = null!, txtObs = null!;
         private ComboBox cbSexo = null!, cbRaca = null!, cbQuantidade = null!, cbProfissional = null!;
         private LinkLabel lnkNovoProf = null!, lnkEditarProf = null!, lnkExcluirProf = null!;
         private List<Profissional> profissionais = new List<Profissional>();
-        private Button btnGerar = null!, btnLimpar = null!, btnAlternarTema = null!;
-        private Panel headerPanel = null!;
-        private Label lblTituloApp = null!, lblAvisoCid = null!, lblStatus = null!, lblAtalhos = null!;
+        private BotaoModerno btnGerar = null!, btnLimpar = null!, btnAlternarTema = null!;
+        private Label lblTituloApp = null!, lblAvisoCid = null!, lblAtalhos = null!;
+        private RotuloStatus lblStatus = null!;
         private LinkLabel lnkPasta = null!, lnkMesmoPaciente = null!;
         private ListBox lstSugestoes = null!;
         private readonly ToolTip dicas = new ToolTip();
 
         // Cada campo fica dentro de uma "caixa" com borda (foco/erro)
         private readonly Dictionary<Control, CaixaCampo> caixas = new Dictionary<Control, CaixaCampo>();
-        private readonly List<Label> labelsSecao = new List<Label>();
-        private readonly List<Panel> divisores = new List<Panel>();
 
         // ---------- Estado ----------
         private bool isDarkMode;
@@ -102,28 +100,36 @@ namespace Projeto_APAC
 
         private void CriarInterface()
         {
-            // --- Cabeçalho ---
-            headerPanel = new Panel { Dock = DockStyle.Top, Height = 60 };
+            DoubleBuffered = true;
+
+            // --- Cabeçalho: painel de vidro (desenhado no fundo) com logo, título e botão de tema ---
             lblTituloApp = new Label {
                 Text = "Emissão de Laudo APAC",
-                Font = new Font("Segoe UI", 14, FontStyle.Bold),
+                Font = new Font("Segoe UI", 15F, FontStyle.Bold),
                 AutoSize = true,
-                Location = new Point(Margem - 2, 15)
+                BackColor = Color.Transparent,
+                Location = new Point(AreaLogo.Right + 10, 15)
             };
-            btnAlternarTema = new Button {
-                Size = new Size(40, 32),
-                Location = new Point(Margem + LarguraUtil - 40, 14),
-                FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI Symbol", 13F),
-                Cursor = Cursors.Hand,
+            lblSubtitulo = new Label {
+                Text = "APAC DIGITAL   •   ESF SÃO CARLOS 2",
+                Font = new Font("Segoe UI", 8F),
+                AutoSize = true,
+                BackColor = Color.Transparent,
+                Location = new Point(AreaLogo.Right + 13, 49),
+                Tag = "mutado"
+            };
+            btnAlternarTema = new BotaoModerno {
+                Estilo = BotaoModerno.Estilos.Icone,
+                Size = new Size(38, 38),
+                Location = new Point(Margem + LarguraUtil - 38 + 4, 24),
+                Raio = 11,
                 TabStop = false
             };
-            btnAlternarTema.FlatAppearance.BorderSize = 0;
             btnAlternarTema.Click += (s, e) => { isDarkMode = !isDarkMode; temaEscolhido = true; SalvarPreferencias(); AplicarTema(); };
             dicas.SetToolTip(btnAlternarTema, "Alternar tema claro / escuro");
-            headerPanel.Controls.Add(lblTituloApp);
-            headerPanel.Controls.Add(btnAlternarTema);
-            Controls.Add(headerPanel);
+            Controls.Add(lblTituloApp);
+            Controls.Add(lblSubtitulo);
+            Controls.Add(btnAlternarTema);
 
             // Lista de sugestões de CID (flutua sobre os campos)
             lstSugestoes = new ListBox {
@@ -140,10 +146,10 @@ namespace Projeto_APAC
             };
             Controls.Add(lstSugestoes);
 
-            int y = 76;
-            CriarSecao("PROFISSIONAL SOLICITANTE", ref y);
+            int y = TopoCartao + 12;
+            CriarSecao("PROFISSIONAL SOLICITANTE", Visual.IconeSaude, ref y);
 
-            cbProfissional = CriarCombo("Médico(a) solicitante *", Margem, y, LarguraUtil, Array.Empty<string>());
+            cbProfissional = CriarCombo("Médico(a) solicitante *", Margem, y, LarguraUtil, Array.Empty<string>(), Visual.IconeContato);
             cbProfissional.SelectedIndexChanged += (s, e) => { AtualizarAcoesProfissional(); SalvarPreferencias(); };
             // Links na linha do rótulo, alinhados à direita (criados da esquerda p/ direita para a ordem do Tab)
             var fonteLink = new Font("Segoe UI", 8.5F);
@@ -153,126 +159,124 @@ namespace Projeto_APAC
             lnkEditarProf = CriarLinkAcao(textosLinks[1], ref xLink, y, EditarProfissional);
             lnkExcluirProf = CriarLinkAcao(textosLinks[2], ref xLink, y, ExcluirProfissional);
             PreencherProfissionais(LerPreferencia("profissional"));
-            y += 72;
+            y += PassoLinha + 6;
 
-            CriarSecao("DADOS DO PACIENTE", ref y);
+            CriarSecao("DADOS DO PACIENTE", Visual.IconeContato, ref y);
 
-            txtNome = CriarTexto("Nome completo *", Margem, y, LarguraUtil, "Ex: JOÃO DA SILVA");
-            y += 62;
+            txtNome = CriarTexto("Nome completo *", Margem, y, LarguraUtil, "Ex: JOÃO DA SILVA", icone: Visual.IconeCartao);
+            y += PassoLinha;
 
-            txtDataNasc = CriarTexto("Nascimento *", Margem, y, 130, "dd/mm/aaaa");
+            txtDataNasc = CriarTexto("Nascimento *", Margem, y, 130, "dd/mm/aaaa", icone: Visual.IconeCalendario);
             txtDataNasc.MaxLength = 10;
             txtDataNasc.CharacterCasing = CharacterCasing.Normal;
             txtDataNasc.TextChanged += (s, e) => FormatarData(txtDataNasc);
-            cbSexo = CriarCombo("Sexo *", 185, y, 80, new[] { "M", "F" });
-            cbRaca = CriarCombo("Raça/Cor", 290, y, 205, new[] { "BRANCA", "PRETA", "PARDA", "AMARELA", "INDÍGENA" });
-            y += 62;
+            cbSexo = CriarCombo("Sexo *", 172, y, 90, new[] { "M", "F" });
+            cbRaca = CriarCombo("Raça/Cor", 274, y, 221, new[] { "BRANCA", "PRETA", "PARDA", "AMARELA", "INDÍGENA" });
+            y += PassoLinha;
 
-            txtMae = CriarTexto("Nome da mãe *", Margem, y, LarguraUtil, "Ex: MARIA DA SILVA");
-            y += 72;
+            txtMae = CriarTexto("Nome da mãe *", Margem, y, LarguraUtil, "Ex: MARIA DA SILVA", icone: Visual.IconePessoas);
+            y += PassoLinha + 6;
 
-            CriarSecao("INFORMAÇÕES CLÍNICAS", ref y);
+            CriarSecao("INFORMAÇÕES CLÍNICAS", Visual.IconeDiagnostico, ref y);
 
-            txtProcedimento = CriarTexto("Procedimento principal *", Margem, y, 380, "Ex: TC DE CRÂNIO");
-            cbQuantidade = CriarCombo("Qtd", 425, y, 70, new[] { "1", "2", "3", "4", "5", "6", "7", "8", "9" });
+            txtProcedimento = CriarTexto("Procedimento principal *", Margem, y, 380, "Ex: TC DE CRÂNIO", icone: Visual.IconeDocumento);
+            cbQuantidade = CriarCombo("Qtd", 422, y, 73, new[] { "1", "2", "3", "4", "5", "6", "7", "8", "9" });
             cbQuantidade.SelectedIndex = 0;
-            y += 62;
+            y += PassoLinha;
 
-            txtCid = CriarTexto("CID-10 *", Margem, y, 100, "Ex: G30");
-            txtDiagnostico = CriarTexto("Diagnóstico (busque por código ou nome)", 150, y, 345, "Digite para buscar...");
+            txtCid = CriarTexto("CID-10 *", Margem, y, 108, "Ex: G30", icone: Visual.IconeEtiqueta);
+            txtDiagnostico = CriarTexto("Diagnóstico (busque por código ou nome)", 150, y, 345, "Digite para buscar...", icone: Visual.IconeBusca);
             lblAvisoCid = new Label {
                 AutoSize = true,
-                Location = new Point(Margem, y + 52),
+                Location = new Point(Margem, y + 20 + AlturaCampo + 1),
                 Font = new Font("Segoe UI", 8F),
+                BackColor = Color.Transparent,
                 Visible = false,
                 Tag = "aviso"
             };
             Controls.Add(lblAvisoCid);
             ConfigurarBuscaCid(txtCid);
             ConfigurarBuscaCid(txtDiagnostico);
-            y += 72;
+            y += PassoLinha + 14;
 
-            txtObs = CriarTexto("Observações / justificativa", Margem, y, LarguraUtil, "Justificativa clínica para o procedimento...", altura: 90);
-            y += 20 + 90 + 12;
+            txtObs = CriarTexto("Observações / justificativa", Margem, y, LarguraUtil, "Justificativa clínica para o procedimento...", altura: 70, icone: Visual.IconeNota);
+            y += 20 + 70 + 10;
 
-            lblStatus = new Label {
-                AutoSize = false,
+            btnGerar = new BotaoModerno {
+                Text = "Gerar e abrir PDF",
+                Icone = Visual.IconeDocumento,
+                Estilo = BotaoModerno.Estilos.Primario,
                 Location = new Point(Margem, y),
-                Size = new Size(LarguraUtil, 20),
-                Font = new Font("Segoe UI", 9F)
+                Size = new Size(300, 44),
+                Font = new Font("Segoe UI", 10.5F, FontStyle.Bold)
             };
-            Controls.Add(lblStatus);
-            y += 24;
-
-            btnGerar = new Button {
-                Text = "GERAR E ABRIR PDF",
-                Location = new Point(Margem, y),
-                Size = new Size(310, 46),
-                FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 11, FontStyle.Bold),
-                Cursor = Cursors.Hand
-            };
-            btnGerar.FlatAppearance.BorderSize = 0;
             btnGerar.Click += BtnGerar_Click;
             dicas.SetToolTip(btnGerar, "Ctrl+Enter  ·  Enter passa para o próximo campo");
             Controls.Add(btnGerar);
 
-            btnLimpar = new Button {
-                Text = "LIMPAR",
-                Location = new Point(355, y),
-                Size = new Size(140, 46),
-                FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 10, FontStyle.Bold),
-                Cursor = Cursors.Hand
+            btnLimpar = new BotaoModerno {
+                Text = "Limpar",
+                Icone = Visual.IconeBorracha,
+                Estilo = BotaoModerno.Estilos.Secundario,
+                Location = new Point(Margem + 312, y),
+                Size = new Size(LarguraUtil - 312, 44),
+                Font = new Font("Segoe UI", 10F, FontStyle.Bold)
             };
-            btnLimpar.FlatAppearance.BorderSize = 1;
             btnLimpar.Click += BtnLimpar_Click;
             Controls.Add(btnLimpar);
-            y += 46 + 12;
+            y += 44 + 8;
 
-            lnkPasta = new LinkLabel {
-                Text = "Abrir pasta dos laudos",
-                AutoSize = true,
-                Location = new Point(Margem - 2, y),
-                Font = new Font("Segoe UI", 9F),
-                LinkBehavior = LinkBehavior.HoverUnderline
+            lblStatus = new RotuloStatus {
+                AutoSize = false,
+                Location = new Point(Margem, y),
+                Size = new Size(LarguraUtil, 26),
+                Font = new Font("Segoe UI", 9F)
             };
+            Controls.Add(lblStatus);
+            y += 26 + 8;
+
+            lnkPasta = CriarLinkRodape("Abrir pasta dos laudos", Visual.IconePasta, Margem, y);
             lnkPasta.LinkClicked += (s, e) => AbrirPastaLaudos();
-            Controls.Add(lnkPasta);
 
-            lnkMesmoPaciente = new LinkLabel {
-                Text = "Novo laudo, mesmo paciente",
-                AutoSize = true,
-                Location = new Point(lnkPasta.Left + TextRenderer.MeasureText(lnkPasta.Text, lnkPasta.Font).Width + 14, y),
-                Font = new Font("Segoe UI", 9F),
-                LinkBehavior = LinkBehavior.HoverUnderline
-            };
+            lnkMesmoPaciente = CriarLinkRodape("Novo laudo, mesmo paciente", Visual.IconeCopiar,
+                Margem + 16 + TextRenderer.MeasureText(lnkPasta.Text, lnkPasta.Font).Width + 14, y);
             lnkMesmoPaciente.LinkClicked += (s, e) => NovoLaudoMesmoPaciente();
             dicas.SetToolTip(lnkMesmoPaciente, "Mantém profissional e paciente; limpa procedimento, CID e justificativa (Ctrl+N)");
-            Controls.Add(lnkMesmoPaciente);
 
             lblAtalhos = new Label {
                 Text = "Ctrl+Enter: gerar PDF",
                 AutoSize = true,
                 Font = new Font("Segoe UI", 8F),
+                BackColor = Color.Transparent,
                 Tag = "mutado"
             };
             Controls.Add(lblAtalhos);
-            lblAtalhos.Location = new Point(Margem + LarguraUtil - TextRenderer.MeasureText(lblAtalhos.Text, lblAtalhos.Font).Width, y + 2);
-            y += 30;
+            lblAtalhos.Location = new Point(Margem + LarguraUtil - TextRenderer.MeasureText(lblAtalhos.Text, lblAtalhos.Font).Width, y + 1);
+            y += 20;
 
-            ClientSize = new Size(Margem * 2 + LarguraUtil, y);
+            AreaCartao = new Rectangle(14, TopoCartao, Margem * 2 + LarguraUtil - 28, y + 10 - TopoCartao);
+            ClientSize = new Size(Margem * 2 + LarguraUtil, y + 24);
             lstSugestoes.BringToFront();
         }
 
-        private void CriarSecao(string titulo, ref int y)
+        // Geometria do visual (em pixels a 100% de escala; o fundo multiplica pela escala do Windows)
+        private const int AlturaCampo = 34, PassoLinha = 20 + AlturaCampo + 6, TopoCartao = 88;
+        private static readonly Rectangle AreaCabecalho = new Rectangle(14, 10, 497, 68);
+        private static readonly Rectangle AreaLogo = new Rectangle(28, 22, 44, 44);
+        private Rectangle AreaCartao;
+        private readonly List<(Rectangle Area, string Icone)> iconesSecao = new List<(Rectangle, string)>();
+        private readonly List<(Rectangle Area, string Icone)> iconesRotulo = new List<(Rectangle, string)>();
+        private Label lblSubtitulo = null!;
+        private Bitmap? fundoCache;
+
+        private void CriarSecao(string titulo, string icone, ref int y)
         {
-            var lbl = new Label { Text = titulo, Location = new Point(Margem, y), AutoSize = true, Font = new Font("Segoe UI", 8.5F, FontStyle.Bold) };
-            var linha = new Panel { Location = new Point(Margem, y + 20), Size = new Size(LarguraUtil, 1) };
-            labelsSecao.Add(lbl);
-            divisores.Add(linha);
+            iconesSecao.Add((new Rectangle(Margem, y, 24, 24), icone));
+            var lbl = new Label {
+                Text = titulo, Location = new Point(Margem + 32, y + 4), AutoSize = true,
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), BackColor = Color.Transparent, Tag = "secao"
+            };
             Controls.Add(lbl);
-            Controls.Add(linha);
             y += 32;
         }
 
@@ -281,7 +285,7 @@ namespace Projeto_APAC
         {
             var lnk = new LinkLabel {
                 Text = texto, AutoSize = true, Font = new Font("Segoe UI", 8.5F),
-                LinkBehavior = LinkBehavior.HoverUnderline, TabStop = true
+                LinkBehavior = LinkBehavior.HoverUnderline, TabStop = true, BackColor = Color.Transparent
             };
             lnk.Location = new Point(x, y);
             x += TextRenderer.MeasureText(texto, lnk.Font).Width + 10;
@@ -290,17 +294,33 @@ namespace Projeto_APAC
             return lnk;
         }
 
-        private Label CriarRotulo(string texto, int x, int y)
+        private LinkLabel CriarLinkRodape(string texto, string icone, int x, int y)
         {
-            var lbl = new Label { Text = texto, Location = new Point(x - 2, y), AutoSize = true, Font = new Font("Segoe UI", 8.5F) };
+            iconesRotulo.Add((new Rectangle(x, y, 15, 17), icone));
+            var lnk = new LinkLabel {
+                Text = texto, AutoSize = true, Location = new Point(x + 16, y), Font = new Font("Segoe UI", 9F),
+                LinkBehavior = LinkBehavior.HoverUnderline, BackColor = Color.Transparent
+            };
+            Controls.Add(lnk);
+            return lnk;
+        }
+
+        private Label CriarRotulo(string texto, int x, int y, string? icone = null)
+        {
+            int deslocamento = 0;
+            if (icone != null) { iconesRotulo.Add((new Rectangle(x, y, 14, 17), icone)); deslocamento = 18; }
+            var lbl = new Label {
+                Text = texto, Location = new Point(x - 2 + deslocamento, y), AutoSize = true,
+                Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), BackColor = Color.Transparent
+            };
             Controls.Add(lbl);
             return lbl;
         }
 
-        private TextBox CriarTexto(string rotulo, int x, int y, int largura, string placeholder, int altura = 30)
+        private TextBox CriarTexto(string rotulo, int x, int y, int largura, string placeholder, int altura = AlturaCampo, string? icone = null)
         {
-            CriarRotulo(rotulo, x, y);
-            bool multilinha = altura > 30;
+            CriarRotulo(rotulo, x, y, icone);
+            bool multilinha = altura > AlturaCampo;
             var tb = new TextBox {
                 BorderStyle = BorderStyle.None,
                 Font = new Font("Segoe UI", 10F),
@@ -314,7 +334,7 @@ namespace Projeto_APAC
             var caixa = new CaixaCampo {
                 Location = new Point(x, y + 20),
                 Size = new Size(largura, altura),
-                Padding = multilinha ? new Padding(6, 5, 2, 4) : new Padding(8, 6, 8, 2)
+                Padding = multilinha ? new Padding(10, 8, 5, 6) : new Padding(12, 8, 10, 3)
             };
             caixa.Controls.Add(tb);
             caixa.Click += (s, e) => tb.Select();
@@ -323,9 +343,9 @@ namespace Projeto_APAC
             return tb;
         }
 
-        private ComboBox CriarCombo(string rotulo, int x, int y, int largura, string[] itens)
+        private ComboBox CriarCombo(string rotulo, int x, int y, int largura, string[] itens, string? icone = null)
         {
-            CriarRotulo(rotulo, x, y);
+            CriarRotulo(rotulo, x, y, icone);
             var cb = new ComboTema {
                 DropDownStyle = ComboBoxStyle.DropDownList,
                 FlatStyle = FlatStyle.Flat,
@@ -337,8 +357,8 @@ namespace Projeto_APAC
             cb.Items.AddRange(itens);
             var caixa = new CaixaCampo {
                 Location = new Point(x, y + 20),
-                Size = new Size(largura, 30),
-                Padding = new Padding(1, 1, 1, 1)
+                Size = new Size(largura, AlturaCampo),
+                Padding = new Padding(6, 4, 8, 4)
             };
             caixa.Controls.Add(cb);
             RegistrarCaixa(cb, caixa);
@@ -370,74 +390,181 @@ namespace Projeto_APAC
         }
 
         // =====================================================================
+        //  Fundo: degradê, painéis de vidro, ícones das seções
+        // =====================================================================
+
+        protected override void OnPaintBackground(PaintEventArgs e) => PintarFundo(e.Graphics);
+
+        protected override void OnClientSizeChanged(EventArgs e)
+        {
+            base.OnClientSizeChanged(e);
+            fundoCache?.Dispose(); fundoCache = null;
+            Invalidate(true);
+        }
+
+        protected override void OnFormClosed(FormClosedEventArgs e)
+        {
+            fundoCache?.Dispose(); fundoCache = null;
+            base.OnFormClosed(e);
+        }
+
+        public void PintarFundo(Graphics g)
+        {
+            var tam = ClientSize;
+            if (tam.Width <= 0 || tam.Height <= 0) return;
+            if (fundoCache == null || fundoCache.Size != tam) { fundoCache?.Dispose(); fundoCache = GerarFundo(tam); }
+            g.DrawImageUnscaled(fundoCache, 0, 0);
+        }
+
+        private Bitmap GerarFundo(Size tam)
+        {
+            var bmp = new Bitmap(tam.Width, tam.Height);
+            using var g = Graphics.FromImage(bmp);
+            g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+            float f = DeviceDpi / 96f;
+            RectangleF S(Rectangle r) => new RectangleF(r.X * f, r.Y * f, r.Width * f, r.Height * f);
+
+            var todo = new Rectangle(Point.Empty, tam);
+            using (var lg = new System.Drawing.Drawing2D.LinearGradientBrush(todo, tema.FundoTopo, tema.FundoBase, 70f))
+                g.FillRectangle(lg, todo);
+            Bolha(g, new RectangleF(tam.Width * 0.35f, -tam.Height * 0.25f, tam.Width * 1.1f, tam.Height * 0.7f), tema.Bolha1);
+            Bolha(g, new RectangleF(-tam.Width * 0.6f, tam.Height * 0.55f, tam.Width * 1.2f, tam.Height * 0.6f), tema.Bolha2);
+
+            // Ondas suaves
+            using (var p = new Pen(Visual.Alfa(tema.Destaque, 38), 2f * f))
+                g.DrawBezier(p, 0, tam.Height * 0.70f, tam.Width * 0.3f, tam.Height * 0.62f, tam.Width * 0.6f, tam.Height * 0.86f, tam.Width, tam.Height * 0.70f);
+            using (var p = new Pen(Visual.Alfa(tema.Destaque, 24), 2f * f))
+                g.DrawBezier(p, 0, tam.Height * 0.76f, tam.Width * 0.35f, tam.Height * 0.68f, tam.Width * 0.6f, tam.Height * 0.93f, tam.Width, tam.Height * 0.78f);
+
+            PainelVidro(g, S(AreaCabecalho), 18 * f, f);
+            PainelVidro(g, S(AreaCartao), 20 * f, f);
+
+            // Logo: quadrado em degradê com ícone de documento
+            var rl = S(AreaLogo);
+            Visual.Sombra(g, rl, 14 * f, Visual.Alfa(tema.LogoB, 90), 6, 3 * f);
+            using (var path = Visual.Arredondado(rl, 13 * f))
+            using (var br = new System.Drawing.Drawing2D.LinearGradientBrush(rl, tema.LogoA, tema.LogoB, 45f))
+                g.FillPath(br, path);
+            using (var fonte = Visual.FonteIcone(17f))
+                Visual.DesenharIcone(g, Visual.IconeDocumento, fonte, Color.White, rl);
+
+            // Ícones das seções e dos rótulos
+            using (var fonteSecao = Visual.FonteIcone(10.5f))
+                foreach (var (area, icone) in iconesSecao)
+                {
+                    var r = S(area);
+                    using var path = Visual.Arredondado(r, 8 * f);
+                    using var br = new System.Drawing.Drawing2D.LinearGradientBrush(r, tema.BadgeA, tema.BadgeB, 45f);
+                    g.FillPath(br, path);
+                    Visual.DesenharIcone(g, icone, fonteSecao, tema.Secao, r);
+                }
+            using (var fonteRotulo = Visual.FonteIcone(8.5f))
+                foreach (var (area, icone) in iconesRotulo)
+                    Visual.DesenharIcone(g, icone, fonteRotulo, tema.IconeRotulo, S(area));
+
+            // Sombra do botão principal
+            if (btnGerar != null)
+            {
+                var rb = new RectangleF(btnGerar.Left + 6 * f, btnGerar.Top + 4 * f, btnGerar.Width - 12 * f, btnGerar.Height - 4 * f);
+                Visual.Sombra(g, rb, 13 * f, Visual.Alfa(tema.BotaoB, isDarkMode ? 70 : 80), 8, 4 * f);
+            }
+            return bmp;
+        }
+
+        private static void Bolha(Graphics g, RectangleF r, Color cor)
+        {
+            using var path = new System.Drawing.Drawing2D.GraphicsPath();
+            path.AddEllipse(r);
+            using var br = new System.Drawing.Drawing2D.PathGradientBrush(path) {
+                CenterColor = cor, SurroundColors = new[] { Color.FromArgb(0, cor) }
+            };
+            g.FillPath(br, path);
+        }
+
+        private void PainelVidro(Graphics g, RectangleF r, float raio, float f)
+        {
+            Visual.Sombra(g, r, raio, tema.Sombra, 10, 4 * f);
+            using var path = Visual.Arredondado(r, raio);
+            using (var b = new SolidBrush(tema.Vidro)) g.FillPath(b, path);
+            using (var p = new Pen(tema.VidroBorda, 1f * f)) g.DrawPath(p, path);
+        }
+
+        // =====================================================================
         //  Tema
         // =====================================================================
 
         internal sealed class Tema
         {
-            public Color Fundo, Cabecalho, TituloApp, Campo, Borda, Texto, Mutado, Destaque, Erro, Ok, Aviso, Divisor, BotaoSecundario;
+            public Color Fundo, FundoTopo, FundoBase, Bolha1, Bolha2, Vidro, VidroBorda, Sombra,
+                Campo, Borda, Texto, Rotulo, Mutado, Destaque, Secao, BadgeA, BadgeB, IconeRotulo,
+                LogoA, LogoB, BotaoA, BotaoB, BotaoSecundario, BotaoSecundarioBorda, BotaoTema, IconeTema,
+                Erro, Ok, Aviso;
+
             public static readonly Tema Escuro = new Tema {
-                Fundo = Color.FromArgb(30, 30, 30), Cabecalho = Color.FromArgb(20, 20, 20), TituloApp = Color.FromArgb(0, 150, 250),
-                Campo = Color.FromArgb(45, 45, 48), Borda = Color.FromArgb(78, 78, 84), Texto = Color.FromArgb(240, 240, 240),
-                Mutado = Color.FromArgb(150, 150, 155), Destaque = Color.FromArgb(0, 150, 250), Erro = Color.FromArgb(240, 95, 85),
-                Ok = Color.FromArgb(90, 200, 120), Aviso = Color.FromArgb(235, 175, 60), Divisor = Color.FromArgb(70, 70, 70),
-                BotaoSecundario = Color.FromArgb(45, 45, 48)
+                Fundo = Color.FromArgb(14, 24, 37), FundoTopo = Color.FromArgb(13, 23, 36), FundoBase = Color.FromArgb(8, 17, 27),
+                Bolha1 = Color.FromArgb(70, 0, 140, 255), Bolha2 = Color.FromArgb(56, 0, 170, 220),
+                Vidro = Color.FromArgb(190, 22, 36, 54), VidroBorda = Color.FromArgb(46, 120, 170, 230), Sombra = Color.FromArgb(90, 0, 0, 0),
+                Campo = Color.FromArgb(12, 22, 35), Borda = Color.FromArgb(48, 70, 98), Texto = Color.FromArgb(231, 240, 250),
+                Rotulo = Color.FromArgb(213, 227, 242), Mutado = Color.FromArgb(124, 147, 173), Destaque = Color.FromArgb(43, 155, 255),
+                Secao = Color.FromArgb(108, 192, 255), BadgeA = Color.FromArgb(28, 58, 92), BadgeB = Color.FromArgb(20, 44, 72),
+                IconeRotulo = Color.FromArgb(127, 163, 200),
+                LogoA = Color.FromArgb(31, 182, 240), LogoB = Color.FromArgb(10, 99, 214),
+                BotaoA = Color.FromArgb(43, 155, 255), BotaoB = Color.FromArgb(10, 98, 216),
+                BotaoSecundario = Color.FromArgb(24, 38, 56), BotaoSecundarioBorda = Color.FromArgb(70, 140, 205),
+                BotaoTema = Color.FromArgb(30, 46, 66), IconeTema = Color.FromArgb(255, 211, 107),
+                Erro = Color.FromArgb(240, 95, 85), Ok = Color.FromArgb(110, 220, 150), Aviso = Color.FromArgb(235, 175, 60)
             };
             public static readonly Tema Claro = new Tema {
-                Fundo = Color.FromArgb(245, 247, 250), Cabecalho = Color.FromArgb(0, 122, 204), TituloApp = Color.White,
-                Campo = Color.White, Borda = Color.FromArgb(190, 196, 205), Texto = Color.FromArgb(40, 40, 40),
-                Mutado = Color.FromArgb(105, 110, 118), Destaque = Color.FromArgb(0, 122, 204), Erro = Color.FromArgb(200, 45, 35),
-                Ok = Color.FromArgb(25, 135, 65), Aviso = Color.FromArgb(170, 100, 0), Divisor = Color.FromArgb(205, 210, 216),
-                BotaoSecundario = Color.White
+                Fundo = Color.FromArgb(232, 243, 252), FundoTopo = Color.FromArgb(234, 245, 255), FundoBase = Color.FromArgb(195, 227, 248),
+                Bolha1 = Color.FromArgb(140, 120, 210, 255), Bolha2 = Color.FromArgb(115, 80, 190, 250),
+                Vidro = Color.FromArgb(165, 255, 255, 255), VidroBorda = Color.FromArgb(235, 255, 255, 255), Sombra = Color.FromArgb(46, 40, 110, 180),
+                Campo = Color.FromArgb(251, 253, 255), Borda = Color.FromArgb(205, 222, 239), Texto = Color.FromArgb(14, 44, 75),
+                Rotulo = Color.FromArgb(18, 53, 90), Mutado = Color.FromArgb(90, 117, 147), Destaque = Color.FromArgb(10, 99, 214),
+                Secao = Color.FromArgb(10, 91, 196), BadgeA = Color.FromArgb(228, 243, 255), BadgeB = Color.FromArgb(207, 230, 251),
+                IconeRotulo = Color.FromArgb(75, 120, 168),
+                LogoA = Color.FromArgb(31, 182, 240), LogoB = Color.FromArgb(10, 99, 214),
+                BotaoA = Color.FromArgb(26, 138, 240), BotaoB = Color.FromArgb(6, 86, 201),
+                BotaoSecundario = Color.FromArgb(246, 251, 255), BotaoSecundarioBorda = Color.FromArgb(143, 196, 242),
+                BotaoTema = Color.FromArgb(250, 253, 255), IconeTema = Color.FromArgb(10, 99, 214),
+                Erro = Color.FromArgb(200, 45, 35), Ok = Color.FromArgb(25, 135, 65), Aviso = Color.FromArgb(170, 100, 0)
             };
         }
 
         private void AplicarTema()
         {
             tema = isDarkMode ? Tema.Escuro : Tema.Claro;
+            fundoCache?.Dispose(); fundoCache = null;
 
             BackColor = tema.Fundo;
-            headerPanel.BackColor = tema.Cabecalho;
-            lblTituloApp.ForeColor = tema.TituloApp;
-            btnAlternarTema.BackColor = tema.Cabecalho;
-            btnAlternarTema.ForeColor = Color.White;
-            btnAlternarTema.FlatAppearance.MouseOverBackColor = ControlPaint.Light(tema.Cabecalho, 0.15f);
-            btnAlternarTema.FlatAppearance.MouseDownBackColor = tema.Cabecalho;
-            btnAlternarTema.Text = isDarkMode ? "☀" : "☾";
+            btnAlternarTema.Icone = isDarkMode ? Visual.IconeSol : Visual.IconeLua;
+            btnAlternarTema.CorFundo = tema.BotaoTema;
+            btnAlternarTema.CorBorda = tema.VidroBorda;
+            btnAlternarTema.CorTexto = tema.IconeTema;
 
             foreach (Control c in Controls)
             {
                 if (c is CaixaCampo caixa)
                 {
                     caixa.CorFundo = tema.Campo; caixa.CorBorda = tema.Borda; caixa.CorFoco = tema.Destaque; caixa.CorErro = tema.Erro;
-                    caixa.BackColor = tema.Campo;
                     foreach (Control filho in caixa.Controls)
                     {
                         filho.BackColor = tema.Campo; filho.ForeColor = tema.Texto;
-                        if (filho is ComboTema ct) { ct.CorSeta = tema.Mutado; ct.CorSelecao = tema.Destaque; ct.Invalidate(); }
+                        if (filho is ComboTema ct) { ct.CorSeta = tema.IconeRotulo; ct.CorSelecao = tema.Destaque; ct.Invalidate(); }
                     }
-                    caixa.Invalidate();
                 }
-                else if (c is Label lbl && !(c is LinkLabel))
+                else if (c is Label lbl && !(c is LinkLabel) && !(c is RotuloStatus))
                 {
-                    if (labelsSecao.Contains(lbl)) lbl.ForeColor = tema.Destaque;
-                    else if ((lbl.Tag as string) == "mutado") lbl.ForeColor = tema.Mutado;
-                    else if ((lbl.Tag as string) == "aviso") lbl.ForeColor = tema.Aviso;
-                    else if (lbl != lblStatus) lbl.ForeColor = tema.Texto;
+                    string? tag = lbl.Tag as string;
+                    lbl.ForeColor = tag == "secao" ? tema.Secao : tag == "mutado" ? tema.Mutado : tag == "aviso" ? tema.Aviso
+                        : lbl == lblTituloApp ? tema.Texto : tema.Rotulo;
                 }
-                else if (c is Panel p && divisores.Contains(p)) p.BackColor = tema.Divisor;
             }
 
             lstSugestoes.BackColor = tema.Campo;
             lstSugestoes.ForeColor = tema.Texto;
 
-            btnGerar.BackColor = tema.Destaque;
-            btnGerar.ForeColor = Color.White;
-            btnGerar.FlatAppearance.MouseOverBackColor = ControlPaint.Light(tema.Destaque, 0.2f);
-            btnLimpar.BackColor = tema.BotaoSecundario;
-            btnLimpar.ForeColor = tema.Texto;
-            btnLimpar.FlatAppearance.BorderColor = tema.Borda;
-            btnLimpar.FlatAppearance.MouseOverBackColor = isDarkMode ? Color.FromArgb(60, 60, 64) : Color.FromArgb(235, 238, 242);
+            btnGerar.CorA = tema.BotaoA; btnGerar.CorB = tema.BotaoB; btnGerar.CorTexto = Color.White;
+            btnLimpar.CorFundo = tema.BotaoSecundario; btnLimpar.CorBorda = tema.BotaoSecundarioBorda; btnLimpar.CorTexto = tema.Destaque;
 
             foreach (var lnk in Controls.OfType<LinkLabel>())
             {
@@ -448,6 +575,7 @@ namespace Projeto_APAC
             }
 
             AplicarBarraDeTitulo();
+            Invalidate(true);
 
             // Barra de rolagem escura na justificativa e na lista de sugestões
             foreach (Control c in new Control[] { txtObs, lstSugestoes })
@@ -1074,15 +1202,21 @@ namespace Projeto_APAC
         }
     }
 
-    /// <summary>Painel com borda de 1px que muda de cor no foco e em caso de erro.</summary>
+    /// <summary>
+    /// Caixa arredondada em volta de um campo: borda que muda de cor no foco (com halo) e em caso de erro.
+    /// Os cantos mostram o fundo do formulário.
+    /// </summary>
     internal sealed class CaixaCampo : Panel
     {
         private bool focado, erro;
         public Color CorFundo = Color.White, CorBorda = Color.Gray, CorFoco = Color.DodgerBlue, CorErro = Color.Red;
+        public const float Raio = 10f;
 
         public CaixaCampo()
         {
-            SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw | ControlStyles.UserPaint, true);
+            SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.ResizeRedraw |
+                     ControlStyles.UserPaint | ControlStyles.SupportsTransparentBackColor, true);
+            BackColor = Color.Transparent;
         }
 
         [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
@@ -1090,13 +1224,27 @@ namespace Projeto_APAC
         [System.ComponentModel.DesignerSerializationVisibility(System.ComponentModel.DesignerSerializationVisibility.Hidden)]
         public bool Erro { get => erro; set { if (erro != value) { erro = value; Invalidate(); } } }
 
+        protected override void OnPaintBackground(PaintEventArgs e) { }
+
         protected override void OnPaint(PaintEventArgs e)
         {
-            e.Graphics.Clear(CorFundo);
+            var g = e.Graphics;
+            Visual.PintarFundoDoPai(this, g);
+            g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+
             Color cor = erro ? CorErro : focado ? CorFoco : CorBorda;
-            int espessura = (erro || focado) ? 2 : 1;
-            using var pen = new Pen(cor, espessura) { Alignment = System.Drawing.Drawing2D.PenAlignment.Inset };
-            e.Graphics.DrawRectangle(pen, 0, 0, Width - 1, Height - 1);
+            if (erro || focado)
+            {
+                // Halo suave em volta do campo ativo
+                using var halo = Visual.Arredondado(new RectangleF(1, 1, Width - 3, Height - 3), Raio + 1.5f);
+                using var penHalo = new Pen(Visual.Alfa(cor, 55), 3f);
+                g.DrawPath(penHalo, halo);
+            }
+            var r = new RectangleF(2.5f, 2.5f, Width - 6f, Height - 6f);
+            using var path = Visual.Arredondado(r, Raio);
+            using (var b = new SolidBrush(CorFundo)) g.FillPath(b, path);
+            using var pen = new Pen(cor, (erro || focado) ? 1.6f : 1f);
+            g.DrawPath(pen, path);
         }
     }
 }

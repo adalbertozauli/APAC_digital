@@ -37,7 +37,7 @@ namespace Projeto_APAC
 
             Controls.Add(new Label {
                 Text = existente == null ? "Novo(a) médico(a) solicitante" : "Editar médico(a) solicitante",
-                Font = new Font("Segoe UI", 11F, FontStyle.Bold), AutoSize = true, Location = new Point(m - 2, y), ForeColor = tema.Destaque
+                Font = new Font("Segoe UI", 11F, FontStyle.Bold), AutoSize = true, Location = new Point(m - 2, y), ForeColor = tema.Secao
             });
             y += 36;
 
@@ -57,7 +57,7 @@ namespace Projeto_APAC
                 if (digitos != txtCns.Text) { txtCns.Text = digitos; txtCns.SelectionStart = digitos.Length; return; }
                 AtualizarStatusCns();
             };
-            lblCnsStatus = new Label { AutoSize = true, Location = new Point(m + 202, y + 27), Font = new Font("Segoe UI", 9F) };
+            lblCnsStatus = new Label { AutoSize = true, Location = new Point(m + 202, y + 29), Font = new Font("Segoe UI", 9F) };
             Controls.Add(lblCnsStatus);
             y += 62;
 
@@ -65,20 +65,20 @@ namespace Projeto_APAC
             Controls.Add(lblErro);
             y += 26;
 
-            var btnSalvar = new Button {
-                Text = "SALVAR", Location = new Point(m, y), Size = new Size(230, 40), FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 10F, FontStyle.Bold), BackColor = tema.Destaque, ForeColor = Color.White, Cursor = Cursors.Hand
+            var btnSalvar = new BotaoModerno {
+                Text = "Salvar", Icone = Visual.IconeSalvar, Estilo = BotaoModerno.Estilos.Primario,
+                Location = new Point(m, y), Size = new Size(230, 40), Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+                CorA = tema.BotaoA, CorB = tema.BotaoB, CorTexto = Color.White
             };
-            btnSalvar.FlatAppearance.BorderSize = 0;
             btnSalvar.Click += (s, e) => Salvar();
             Controls.Add(btnSalvar);
 
-            var btnCancelar = new Button {
-                Text = "CANCELAR", Location = new Point(m + 242, y), Size = new Size(130, 40), FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 10F, FontStyle.Bold), BackColor = tema.BotaoSecundario, ForeColor = tema.Texto,
-                DialogResult = DialogResult.Cancel, Cursor = Cursors.Hand
+            var btnCancelar = new BotaoModerno {
+                Text = "Cancelar", Estilo = BotaoModerno.Estilos.Secundario,
+                Location = new Point(m + 242, y), Size = new Size(130, 40), Font = new Font("Segoe UI", 10F, FontStyle.Bold),
+                CorFundo = tema.BotaoSecundario, CorBorda = tema.BotaoSecundarioBorda, CorTexto = tema.Destaque,
+                DialogResult = DialogResult.Cancel
             };
-            btnCancelar.FlatAppearance.BorderColor = tema.Borda;
             Controls.Add(btnCancelar);
             y += 40 + 20;
 
@@ -91,7 +91,7 @@ namespace Projeto_APAC
         }
 
         private Label Rotulo(string texto, int x, int y) =>
-            new Label { Text = texto, AutoSize = true, Location = new Point(x - 2, y), Font = new Font("Segoe UI", 8.5F), ForeColor = tema.Texto };
+            new Label { Text = texto, AutoSize = true, Location = new Point(x - 2, y), Font = new Font("Segoe UI", 8.5F, FontStyle.Bold), ForeColor = tema.Rotulo };
 
         private TextBox NovoTexto(string placeholder, out CaixaCampo caixa, int x, int y, int largura)
         {
@@ -100,8 +100,8 @@ namespace Projeto_APAC
                 Dock = DockStyle.Fill, BackColor = tema.Campo, ForeColor = tema.Texto
             };
             var c = new CaixaCampo {
-                Location = new Point(x, y), Size = new Size(largura, 30), Padding = new Padding(8, 6, 8, 2),
-                CorFundo = tema.Campo, CorBorda = tema.Borda, CorFoco = tema.Destaque, CorErro = tema.Erro, BackColor = tema.Campo
+                Location = new Point(x, y), Size = new Size(largura, 34), Padding = new Padding(12, 8, 10, 3),
+                CorFundo = tema.Campo, CorBorda = tema.Borda, CorFoco = tema.Destaque, CorErro = tema.Erro
             };
             c.Controls.Add(tb);
             c.Click += (s, e) => tb.Select();

@@ -444,10 +444,26 @@ static class Testes
         Capturar(form, "tela_sugestoes");
         Teclar("{ENTER}");   // escolhe a sugestão marcada (M54.5 - DOR LOMBAR BAIXA)
         Focar(Campo<Button>(form, "btnGerar"));
+        void Status()
+        {
+            object tema = form.GetType().GetField("tema", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(form)!;
+            var ok = (Color)tema.GetType().GetField("Ok")!.GetValue(tema)!;
+            form.GetType().GetMethod("MostrarStatus", BindingFlags.NonPublic | BindingFlags.Instance)!
+                .Invoke(form, new object[] { "✓ Laudo salvo: Laudo_MARIA_DE_SOUZA_EXEMPLO_2026-11-17_143005.pdf", ok });
+            Pump();
+        }
+        Status();
         Capturar(form, "tela_preenchida");
-        Campo<Button>(form, "btnAlternarTema").PerformClick(); Pump();
+        Campo<Button>(form, "btnAlternarTema").PerformClick(); Status();
         Capturar(form, "tela_preenchida_outro_tema");
         Campo<Button>(form, "btnAlternarTema").PerformClick(); Pump();
+        ComDialogo(() => Chamar(form, "CadastrarProfissional"), dlg => {
+            Campo<TextBox>(dlg, "txtNome").Text = "DR. CARLOS EXEMPLO";
+            Campo<TextBox>(dlg, "txtCns").Text = CnsCarlos;
+            Pump();
+            Capturar(dlg, "tela_cadastro");
+            dlg.Close();
+        });
         Definir(form, "alteradoDesdeUltimoLaudo", false);
         form.Dispose();
 

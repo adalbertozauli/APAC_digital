@@ -76,6 +76,10 @@ O app preenche o próprio modelo do laudo do Ministério da Saúde, com nome da 
 - **Tema claro e escuro,** que segue o tema do Windows ou a escolha do usuário.
 - **Funciona sem internet:** nenhum dado de paciente sai do computador.
 
+<p align="center">
+  <img src="docs/imagens/cadastro-profissional.png" alt="Janela de cadastro de profissional com CNS validado" width="420">
+</p>
+
 ---
 
 ## Instalação
