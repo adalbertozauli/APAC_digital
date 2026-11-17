@@ -72,26 +72,71 @@ internal static class Program
 
     private const string ChavePastaLaudos = "pastaLaudos=";
 
-    // Pergunta onde salvar os laudos; se o usuário cancelar, mantém a pasta atual (ou a padrão)
+    // Pergunta onde salvar os laudos; se o usuário cancelar, mantém a pasta atual (ou a padrão).
+    // Só aceita uma pasta em que seja possível gravar arquivos.
     private static string EscolherPastaLaudos()
     {
-        string atual = LerPastaLaudosSalva() ?? Path.Combine(
+        string padrao = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), AppName, "Laudos");
+        string atual = LerPastaLaudosSalva() ?? padrao;
 
-        using var dialogo = new FolderBrowserDialog
+        // Cria a pasta sugerida para que ela já venha selecionada na janela
+        bool criouSugerida = false;
+        if (!Directory.Exists(atual))
         {
-            Description = "Escolha a pasta onde os laudos em PDF serão salvos",
-            UseDescriptionForTitle = true,
-            ShowNewFolderButton = true,
-            SelectedPath = Directory.Exists(atual) ? atual : Path.GetDirectoryName(atual) ?? atual,
-        };
-
-        if (dialogo.ShowDialog() == DialogResult.OK && !string.IsNullOrWhiteSpace(dialogo.SelectedPath))
-        {
-            return dialogo.SelectedPath;
+            try { Directory.CreateDirectory(atual); criouSugerida = true; }
+            catch (Exception) { atual = padrao; Directory.CreateDirectory(atual); criouSugerida = true; }
         }
 
-        return atual;
+        while (true)
+        {
+            using var dialogo = new FolderBrowserDialog
+            {
+                Description = "Escolha a pasta onde os laudos em PDF serão salvos",
+                UseDescriptionForTitle = true,
+                ShowNewFolderButton = true,
+                SelectedPath = atual,
+            };
+
+            string escolhida = dialogo.ShowDialog() == DialogResult.OK && !string.IsNullOrWhiteSpace(dialogo.SelectedPath)
+                ? dialogo.SelectedPath
+                : atual;
+
+            if (PodeGravar(escolhida))
+            {
+                // Remove a pasta sugerida que foi criada só para a janela, se não foi a escolhida
+                if (criouSugerida && !string.Equals(Path.GetFullPath(escolhida), Path.GetFullPath(atual), StringComparison.OrdinalIgnoreCase))
+                {
+                    try { if (!Directory.EnumerateFileSystemEntries(atual).Any()) Directory.Delete(atual); }
+                    catch (Exception) { /* sobra uma pasta vazia: sem problema */ }
+                }
+                return escolhida;
+            }
+
+            MessageBox.Show(
+                $"Não é possível salvar arquivos em:\n{escolhida}\n\nEscolha outra pasta, por exemplo dentro de Documentos.",
+                AppName,
+                MessageBoxButtons.OK,
+                MessageBoxIcon.Warning);
+            if (!PodeGravar(atual)) atual = padrao;
+        }
+    }
+
+    // Testa se dá para criar um arquivo na pasta (ex.: C:\ e Arquivos de Programas exigem administrador)
+    private static bool PodeGravar(string pasta)
+    {
+        try
+        {
+            Directory.CreateDirectory(pasta);
+            string teste = Path.Combine(pasta, $".apac-teste-{Guid.NewGuid():N}.tmp");
+            File.WriteAllText(teste, "");
+            File.Delete(teste);
+            return true;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
     }
 
     private static string? LerPastaLaudosSalva()

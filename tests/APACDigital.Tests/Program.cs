@@ -90,6 +90,27 @@ static class Testes
 
         var a1 = svc.PreencherLaudo(Dados(curta), Modelo, Path.Combine(Saida, "curta.pdf"));
         Check(a1.Count == 0, "justificativa curta: sem aviso");
+
+        // Descrição de CID longa (85 caracteres) quebra em duas linhas em vez de ser cortada
+        var dLongo = Dados(curta, "M51.1");
+        dLongo.DescricaoDiagnostico = "TRANSTORNOS DE DISCOS LOMBARES E DE OUTROS DISCOS INTERVERTEBRAIS COM RADICULOPATIA";
+        var aDiag = svc.PreencherLaudo(dLongo, Modelo, Path.Combine(Saida, "diagnostico_longo.pdf"));
+        string tDiag = Texto(Path.Combine(Saida, "diagnostico_longo.pdf"));
+        Check(aDiag.Count == 0 && tDiag.Contains("RADICULOPATIA"), $"diagnóstico longo aparece inteiro, sem aviso [{string.Join(" | ", aDiag)}]");
+
+        // Quantos CIDs da tabela cabem no campo de diagnóstico (amostra: um por tamanho de descrição)
+        var porTamanho = File.ReadLines(Path.Combine(Base, "cids.txt"))
+            .Select(l => l[(l.IndexOf(',') + 1)..]).GroupBy(d => d.Length).Select(g => g.First()).OrderBy(d => d.Length).ToList();
+        string tmp = Path.Combine(Saida, "medida.pdf");
+        int maiorQueCabe = 0;
+        foreach (string desc in porTamanho)
+        {
+            var d = Dados("", "A00"); d.DescricaoDiagnostico = desc;
+            if (svc.PreencherLaudo(d, Modelo, tmp).Count == 0) maiorQueCabe = desc.Length; else break;
+        }
+        int cabem = File.ReadLines(Path.Combine(Base, "cids.txt")).Count(l => l.Length - l.IndexOf(',') - 1 <= maiorQueCabe);
+        Console.WriteLine($"     (diagnóstico: cabem descrições até {maiorQueCabe} caracteres = {cabem} CIDs)");
+        Check(maiorQueCabe >= 120, "descrições de CID até 120 caracteres cabem no laudo");
         string t1 = Texto(Path.Combine(Saida, "curta.pdf"));
         Check(t1.Contains("JOÃO DA SILVA") && t1.Contains("I10") && t1.Contains("CEFALEIA"), "PDF contém nome, CID e justificativa");
 
@@ -99,13 +120,13 @@ static class Testes
         svc.PreencherLaudo(Dados(curta, ""), Modelo, Path.Combine(Saida, "semcid.pdf"));
         Check(!Texto(Path.Combine(Saida, "semcid.pdf")).Contains("EX:"), "sem CID: PDF não contém 'EX:'");
 
-        // Campos de uma linha: texto longo reduz a letra; texto absurdo gera aviso
+        // Campos de uma linha: texto longo reduz a letra (ou quebra em duas linhas); texto absurdo gera aviso
         var longo = Dados(curta);
         longo.ProcedimentoPrincipal = "RESSONANCIA MAGNETICA DE COLUNA LOMBO-SACRA COM CONTRASTE";
         var aLongo = svc.PreencherLaudo(longo, Modelo, Path.Combine(Saida, "procedimento_longo.pdf"));
         Check(aLongo.Count == 0, $"procedimento de 57 letras cabe com letra menor ({aLongo.Count} aviso)");
         Check(Texto(Path.Combine(Saida, "procedimento_longo.pdf")).Contains("COM CONTRASTE"), "procedimento longo aparece inteiro no PDF");
-        longo.ProcedimentoPrincipal = string.Join(" ", Enumerable.Repeat("PROCEDIMENTO MUITO LONGO", 6));
+        longo.ProcedimentoPrincipal = string.Join(" ", Enumerable.Repeat("PROCEDIMENTO MUITO LONGO", 15));
         var aAbsurdo = svc.PreencherLaudo(longo, Modelo, Path.Combine(Saida, "procedimento_absurdo.pdf"));
         Check(aAbsurdo.Count == 1 && aAbsurdo[0].Contains("Procedimento"), "procedimento que não cabe nem com letra mínima gera aviso");
 
@@ -232,6 +253,20 @@ static class Testes
 
     static void TestarUi()
     {
+        // Primeiro uso: nenhum profissional cadastrado, a tela orienta a cadastrar
+        if (File.Exists(RepositorioProfissionais.Arquivo)) File.Delete(RepositorioProfissionais.Arquivo);
+        using (var vazio = new FormPrincipal())
+        {
+            formAtual = vazio;
+            vazio.Show(); Pump();
+            Check(Campo<ComboBox>(vazio, "cbProfissional").Items.Count == 0, "primeiro uso: nenhum médico na lista");
+            Check(Campo<Label>(vazio, "lblStatus").Text.Contains("Cadastrar novo"), $"primeiro uso: tela pede o cadastro [{Campo<Label>(vazio, "lblStatus").Text}]");
+            Campo<TextBox>(vazio, "txtNome").Text = "PACIENTE TESTE";
+            Campo<Button>(vazio, "btnGerar").PerformClick(); Pump();
+            Check(Campo<Label>(vazio, "lblStatus").Text.Contains("médico(a) solicitante"), "sem médico cadastrado, não gera o laudo");
+            Definir(vazio, "alteradoDesdeUltimoLaudo", false);
+        }
+
         // Um profissional fictício já cadastrado (o app não traz nenhum no primeiro uso)
         RepositorioProfissionais.Salvar(new List<Profissional> { new Profissional { Nome = "DR. CARLOS EXEMPLO", Cns = CnsCarlos } });
         var form = new FormPrincipal();

@@ -143,7 +143,18 @@ namespace Projeto_APAC.Services
                 float largura = area.GetWidth() - 6;
                 while (tamanho > FonteLinhaMinima && helvetica.GetWidth(valor, tamanho) > largura) tamanho -= 0.5f;
                 if (helvetica.GetWidth(valor, tamanho) > largura)
-                    avisos.Add($"O campo \"{rotulo}\" é longo demais para o espaço do laudo e pode ter sido cortado. Revise o PDF ou abrevie o texto.");
+                {
+                    // Não cabe numa linha: tenta quebrar em duas ou mais linhas dentro da altura do campo
+                    // (ex.: descrições longas de CID no campo 36)
+                    float? cabe = CalcularFonteQueCabe(valor, area, helvetica, FonteLinhaMinima, FonteObsMinima);
+                    if (cabe.HasValue)
+                    {
+                        campo.SetFieldFlags(PdfTextFormField.FF_MULTILINE);
+                        tamanho = cabe.Value;
+                    }
+                    else
+                        avisos.Add($"O campo \"{rotulo}\" é longo demais para o espaço do laudo e pode ter sido cortado. Revise o PDF ou abrevie o texto.");
+                }
             }
             SetCampo(campos, nome, valor, tamanho);
         }
@@ -161,13 +172,14 @@ namespace Projeto_APAC.Services
         /// Maior tamanho de fonte (entre o máximo e o mínimo) em que o texto cabe no campo,
         /// com quebra automática de linha. Retorna null se não couber nem no mínimo.
         /// </summary>
-        private static float? CalcularFonteQueCabe(string texto, Rectangle area, PdfFont fonte)
+        private static float? CalcularFonteQueCabe(string texto, Rectangle area, PdfFont fonte,
+            float maximo = FonteObsMaxima, float minimo = FonteObsMinima)
         {
             // Margens internas e entrelinha usadas de forma conservadora
             float largura = area.GetWidth() - 6;
             float altura = area.GetHeight() - 4;
 
-            for (float tamanho = FonteObsMaxima; tamanho >= FonteObsMinima; tamanho -= 0.5f)
+            for (float tamanho = maximo; tamanho >= minimo; tamanho -= 0.5f)
             {
                 int linhas = ContarLinhas(texto, fonte, tamanho, largura);
                 if (linhas * tamanho * 1.2f <= altura) return tamanho;
