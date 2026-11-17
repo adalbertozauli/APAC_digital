@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.Text.RegularExpressions;
+using System.Runtime.InteropServices;
 using iText.Kernel.Pdf;
 using iText.Kernel.Pdf.Canvas.Parser;
 using Projeto_APAC;
@@ -378,32 +379,60 @@ static class Testes
 
     static void Telas()
     {
+        // Somente dados fictícios nas capturas (usadas no README)
+        var prof = new Profissional { Nome = "DRA. ANA EXEMPLO", Cns = CnsValido("70012345678901") };
+        RepositorioProfissionais.Salvar(new List<Profissional> { prof });
+        const string obs = "PACIENTE COM LOMBALGIA HÁ 6 MESES, IRRADIADA PARA MEMBRO INFERIOR ESQUERDO, " +
+                           "SEM MELHORA COM ANALGÉSICOS E FISIOTERAPIA. INVESTIGAR HÉRNIA DE DISCO.";
+
         var form = new FormPrincipal();
         formAtual = form;
         form.Show(); Pump();
-        Capturar(form, "tela_1");
-        Campo<Button>(form, "btnAlternarTema").PerformClick(); Pump();
-        Capturar(form, "tela_2");
-        Campo<Button>(form, "btnAlternarTema").PerformClick(); Pump();
+        Capturar(form, "tela_vazia");
+
+        Campo<TextBox>(form, "txtNome").Text = "MARIA DE SOUZA EXEMPLO";
+        Campo<TextBox>(form, "txtDataNasc").Text = "12/08/1975";
+        Campo<ComboBox>(form, "cbSexo").SelectedItem = "F";
+        Campo<ComboBox>(form, "cbRaca").SelectedItem = "PARDA";
+        Campo<TextBox>(form, "txtMae").Text = "JOANA DE SOUZA EXEMPLO";
+        Campo<TextBox>(form, "txtProcedimento").Text = "RESSONÂNCIA MAGNÉTICA DE COLUNA LOMBO-SACRA";
+        Campo<TextBox>(form, "txtObs").Text = obs;
+        Pump();
+
         var diag = Campo<TextBox>(form, "txtDiagnostico");
         Focar(diag); Teclar("lombar");
         Capturar(form, "tela_sugestoes");
-        Teclar("{ESC}");
+        Teclar("{ENTER}");   // escolhe a sugestão marcada (M54.5 - DOR LOMBAR BAIXA)
+        Focar(Campo<Button>(form, "btnGerar"));
+        Capturar(form, "tela_preenchida");
+        Campo<Button>(form, "btnAlternarTema").PerformClick(); Pump();
+        Capturar(form, "tela_preenchida_outro_tema");
+        Campo<Button>(form, "btnAlternarTema").PerformClick(); Pump();
         Definir(form, "alteradoDesdeUltimoLaudo", false);
         form.Dispose();
 
-        var dados = Dados("PACIENTE COM CEFALEIA PERSISTENTE.");
-        dados.ProcedimentoPrincipal = "RESSONANCIA MAGNETICA DE COLUNA LOMBO-SACRA COM CONTRASTE";
+        var dados = new DadosApac {
+            NomePaciente = "MARIA DE SOUZA EXEMPLO", DataNascimento = "12/08/1975", Sexo = "F", RacaCor = "PARDA",
+            NomeMae = "JOANA DE SOUZA EXEMPLO", ProcedimentoPrincipal = "RESSONÂNCIA MAGNÉTICA DE COLUNA LOMBO-SACRA",
+            Quantidade = "1", Cid10Principal = "M54.5", DescricaoDiagnostico = "DOR LOMBAR BAIXA",
+            Observacoes = obs, NomeProfissional = prof.Nome, CnsProfissional = prof.Cns
+        };
         string pdf = Path.Combine(Saida, "laudo_exemplo.pdf");
         new GeradorPdfService().PreencherLaudo(dados, Modelo, pdf);
         Renderizar(pdf, Path.Combine(Saida, "laudo_exemplo.png"));
         Console.WriteLine("Capturas salvas em " + Saida);
     }
 
+    [StructLayout(LayoutKind.Sequential)] struct RECT { public int Left, Top, Right, Bottom; }
+    [DllImport("dwmapi.dll")] static extern int DwmGetWindowAttribute(IntPtr h, int attr, out RECT valor, int tamanho);
+
     static void Capturar(Form f, string nome)
     {
         f.TopMost = true; Pump();
+        // Bounds inclui a borda invisível do Windows 11; a moldura visível vem do DWM
         var r = f.Bounds;
+        if (DwmGetWindowAttribute(f.Handle, 9 /* DWMWA_EXTENDED_FRAME_BOUNDS */, out RECT q, Marshal.SizeOf<RECT>()) == 0)
+            r = Rectangle.FromLTRB(q.Left, q.Top, q.Right, q.Bottom);
         using var bmp = new Bitmap(r.Width, r.Height);
         using (var g = Graphics.FromImage(bmp)) g.CopyFromScreen(r.Location, Point.Empty, r.Size);
         bmp.Save(Path.Combine(Saida, nome + ".png"));
