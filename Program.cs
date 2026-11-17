@@ -45,13 +45,17 @@ namespace Projeto_APAC
 
         private Tema tema = Tema.Escuro;
 
-        internal static string PastaLaudos { get; set; } = Path.Combine(
+        // Declarado antes de PastaLaudos: inicializadores estáticos rodam na ordem do arquivo
+        private static readonly string ArquivoPreferencias = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "APAC Digital", "preferencias.txt");
+
+        // Pasta escolhida no instalador (preferência "pastaLaudos"); sem ela, Documentos\APAC Digital\Laudos
+        private static readonly string? pastaLaudosEscolhida = LerPreferencia("pastaLaudos") is { Length: > 0 } p ? p : null;
+
+        internal static string PastaLaudos { get; set; } = pastaLaudosEscolhida ?? Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "APAC Digital", "Laudos");
 
         internal static bool AbrirPdfAoGerar { get; set; } = true;
-
-        private static readonly string ArquivoPreferencias = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "APAC Digital", "preferencias.txt");
 
         private const int Margem = 30;
         private const int LarguraUtil = 465;
@@ -469,7 +473,7 @@ namespace Projeto_APAC
             AplicarBarraDeTitulo();
         }
 
-        // Preferências simples "chave=valor" (tema e último profissional escolhido)
+        // Preferências simples "chave=valor" (tema, último profissional e pasta dos laudos)
         private static string? LerPreferencia(string chave)
         {
             try
@@ -504,6 +508,7 @@ namespace Projeto_APAC
                 var linhas = new List<string>();
                 if (temaEscolhido) linhas.Add("tema=" + (isDarkMode ? "escuro" : "claro"));
                 if (cbProfissional.SelectedItem is Profissional p) linhas.Add("profissional=" + p.Cns);
+                if (pastaLaudosEscolhida != null) linhas.Add("pastaLaudos=" + pastaLaudosEscolhida);
                 Directory.CreateDirectory(Path.GetDirectoryName(ArquivoPreferencias)!);
                 File.WriteAllLines(ArquivoPreferencias, linhas);
             }

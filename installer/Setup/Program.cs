@@ -26,8 +26,12 @@ internal static class Program
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                 "APACDigital");
 
+            string pastaLaudos = EscolherPastaLaudos();
+
             Directory.CreateDirectory(installDir);
             ExtractPayload(installDir);
+            Directory.CreateDirectory(pastaLaudos);
+            SalvarPastaLaudos(pastaLaudos);
 
             string exePath = Path.Combine(installDir, ExeName);
             string uninstallScript = CreateUninstallScript(installDir);
@@ -45,7 +49,7 @@ internal static class Program
             RegisterUninstallEntry(installDir, exePath, uninstallScript);
 
             MessageBox.Show(
-                $"{AppName} foi instalado com sucesso.",
+                $"{AppName} foi instalado com sucesso.\n\nOs laudos serão salvos em:\n{pastaLaudos}",
                 AppName,
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Information);
@@ -60,6 +64,60 @@ internal static class Program
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Error);
         }
+    }
+
+    // Mesmo arquivo de preferências lido pelo aplicativo (chave=valor)
+    private static readonly string ArquivoPreferencias = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), AppName, "preferencias.txt");
+
+    private const string ChavePastaLaudos = "pastaLaudos=";
+
+    // Pergunta onde salvar os laudos; se o usuário cancelar, mantém a pasta atual (ou a padrão)
+    private static string EscolherPastaLaudos()
+    {
+        string atual = LerPastaLaudosSalva() ?? Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), AppName, "Laudos");
+
+        using var dialogo = new FolderBrowserDialog
+        {
+            Description = "Escolha a pasta onde os laudos em PDF serão salvos",
+            UseDescriptionForTitle = true,
+            ShowNewFolderButton = true,
+            SelectedPath = Directory.Exists(atual) ? atual : Path.GetDirectoryName(atual) ?? atual,
+        };
+
+        if (dialogo.ShowDialog() == DialogResult.OK && !string.IsNullOrWhiteSpace(dialogo.SelectedPath))
+        {
+            return dialogo.SelectedPath;
+        }
+
+        return atual;
+    }
+
+    private static string? LerPastaLaudosSalva()
+    {
+        try
+        {
+            if (!File.Exists(ArquivoPreferencias)) return null;
+            string? linha = File.ReadLines(ArquivoPreferencias).FirstOrDefault(l => l.StartsWith(ChavePastaLaudos));
+            string? valor = linha?.Substring(ChavePastaLaudos.Length).Trim();
+            return string.IsNullOrEmpty(valor) ? null : valor;
+        }
+        catch (Exception)
+        {
+            return null;
+        }
+    }
+
+    // Grava a pasta escolhida sem apagar as demais preferências (tema, profissional)
+    private static void SalvarPastaLaudos(string pasta)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(ArquivoPreferencias)!);
+        var linhas = File.Exists(ArquivoPreferencias)
+            ? File.ReadAllLines(ArquivoPreferencias).Where(l => !l.StartsWith(ChavePastaLaudos)).ToList()
+            : new List<string>();
+        linhas.Add(ChavePastaLaudos + pasta);
+        File.WriteAllLines(ArquivoPreferencias, linhas);
     }
 
     private static void ExtractPayload(string installDir)
