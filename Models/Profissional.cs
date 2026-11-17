@@ -37,9 +37,6 @@ namespace Projeto_APAC.Models
         public static string Arquivo { get; set; } = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "APAC Digital", "profissionais.json");
 
-        // Profissional que já vinha fixo no aplicativo: cadastrado automaticamente no primeiro uso
-        private static readonly Profissional Padrao = new Profissional { Nome = "DR. ADALBERTO ZAULI DOS SANTOS", Cns = "703200673914795" };
-
         private static readonly JsonSerializerOptions Opcoes = new JsonSerializerOptions { WriteIndented = true };
 
         public static List<Profissional> Carregar()
@@ -52,8 +49,9 @@ namespace Projeto_APAC.Models
                     if (lista != null) return lista.Where(p => !string.IsNullOrWhiteSpace(p.Nome)).ToList();
                 }
             }
-            catch (Exception) { /* arquivo corrompido: recomeça com o padrão */ }
-            return new List<Profissional> { new Profissional { Nome = Padrao.Nome, Cns = Padrao.Cns } };
+            catch (Exception) { /* arquivo corrompido: recomeça com a lista vazia */ }
+            // Primeiro uso: nenhum profissional vem cadastrado; o usuário cadastra o seu
+            return new List<Profissional>();
         }
 
         public static void Salvar(List<Profissional> lista)

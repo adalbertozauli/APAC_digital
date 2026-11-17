@@ -72,7 +72,7 @@ static class Testes
         NomePaciente = "JOÃO DA SILVA", DataNascimento = "05/03/1960", Sexo = "M", RacaCor = "PARDA",
         NomeMae = "MARIA DA SILVA", ProcedimentoPrincipal = "TC DE CRÂNIO", Quantidade = "1",
         Cid10Principal = cid, DescricaoDiagnostico = cid == "" ? "" : "HIPERTENSÃO ESSENCIAL (PRIMÁRIA)", Observacoes = obs,
-        NomeProfissional = "DR. ADALBERTO ZAULI DOS SANTOS", CnsProfissional = "703200673914795"
+        NomeProfissional = "DR. CARLOS EXEMPLO", CnsProfissional = CnsCarlos
     };
 
     static string Texto(string path)
@@ -124,6 +124,9 @@ static class Testes
     //  Profissionais
     // =====================================================================
 
+    // CNS fictício (válido pelo dígito verificador) usado nos testes
+    const string CnsCarlos = "700999888777668";
+
     // Gera um CNS provisório válido (começa com 7) para os testes
     static string CnsValido(string prefixo14)
     {
@@ -135,18 +138,18 @@ static class Testes
 
     static void TestarProfissionais()
     {
-        Check(Profissional.CnsValido("703200673914795"), "CNS do Dr. Adalberto é válido");
-        Check(!Profissional.CnsValido("703200673914796"), "CNS com último dígito errado é inválido");
-        Check(!Profissional.CnsValido("70320067391479"), "CNS com 14 dígitos é inválido");
-        Check(!Profissional.CnsValido("303200673914795"), "CNS começando com 3 é inválido");
+        Check(Profissional.CnsValido(CnsCarlos), "CNS válido é aceito");
+        Check(!Profissional.CnsValido("700999888777669"), "CNS com último dígito errado é inválido");
+        Check(!Profissional.CnsValido("70099988877766"), "CNS com 14 dígitos é inválido");
+        Check(!Profissional.CnsValido("300999888777668"), "CNS começando com 3 é inválido");
         string cnsMaria = CnsValido("70012345678901");
         Check(Profissional.CnsValido(cnsMaria), "CNS gerado para teste é válido");
 
         var lista = RepositorioProfissionais.Carregar();
-        Check(lista.Count == 1 && lista[0].Cns == "703200673914795", "primeiro uso traz o Dr. Adalberto cadastrado");
+        Check(lista.Count == 0, "primeiro uso vem sem profissionais cadastrados");
         lista.Add(new Profissional { Nome = "DRA. TESTE", Cns = cnsMaria });
         RepositorioProfissionais.Salvar(lista);
-        Check(RepositorioProfissionais.Carregar().Count == 2, "cadastro salvo e recarregado");
+        Check(RepositorioProfissionais.Carregar().Count == 1, "cadastro salvo e recarregado");
         File.Delete(RepositorioProfissionais.Arquivo);
 
         var dados = Dados("TESTE");
@@ -155,7 +158,7 @@ static class Testes
         string pdf = Path.Combine(Saida, "outro_medico.pdf");
         new GeradorPdfService().PreencherLaudo(dados, Modelo, pdf);
         string t = Texto(pdf);
-        Check(t.Contains("DRA. MARIA DE SOUZA") && !t.Contains("ADALBERTO"), "PDF usa o profissional escolhido");
+        Check(t.Contains("DRA. MARIA DE SOUZA") && !t.Contains("CARLOS EXEMPLO"), "PDF usa o profissional escolhido");
         Check(t.Replace(" ", "").Replace("\n", "").Contains(cnsMaria), "PDF contém o CNS do profissional escolhido");
     }
 
@@ -229,6 +232,8 @@ static class Testes
 
     static void TestarUi()
     {
+        // Um profissional fictício já cadastrado (o app não traz nenhum no primeiro uso)
+        RepositorioProfissionais.Salvar(new List<Profissional> { new Profissional { Nome = "DR. CARLOS EXEMPLO", Cns = CnsCarlos } });
         var form = new FormPrincipal();
         formAtual = form;
         form.Show(); form.Activate(); Pump();
@@ -317,7 +322,7 @@ static class Testes
 
         // ---- Profissionais ----
         var cbProf = Campo<ComboBox>(form, "cbProfissional");
-        Check(cbProf.SelectedItem?.ToString()!.StartsWith("DR. ADALBERTO") == true, $"profissional padrão selecionado: [{cbProf.Text}]");
+        Check(cbProf.SelectedItem?.ToString()!.StartsWith("DR. CARLOS EXEMPLO") == true, $"profissional padrão selecionado: [{cbProf.Text}]");
 
         string cnsNovo = CnsValido("70098765432101");
         string? erroCnsInvalido = null;
@@ -327,7 +332,7 @@ static class Testes
             tCns.Text = "703 2006 7391 4790";               // colado com espaços e dígito errado
             Chamar(dlg, "Salvar");
             erroCnsInvalido = Campo<Label>(dlg, "lblErro").Text;
-            tCns.Text = "703200673914795";                   // CNS de outro profissional já cadastrado
+            tCns.Text = CnsCarlos;                   // CNS de outro profissional já cadastrado
             Chamar(dlg, "Salvar");
             Check(Campo<Label>(dlg, "lblErro").Text.Contains("já está cadastrado"), "CNS repetido é recusado");
             tCns.Text = cnsNovo;

@@ -74,7 +74,13 @@ namespace Projeto_APAC
             AplicarTema();
             MigrarLaudosAntigos();
             inicializado = true;
-            Shown += (s, e) => { AplicarTema(); txtNome.Select(); };
+            Shown += (s, e) => {
+                AplicarTema();
+                txtNome.Select();
+                // Primeiro uso: nenhum profissional vem cadastrado
+                if (profissionais.Count == 0)
+                    MostrarStatus("Comece cadastrando o(a) médico(a) solicitante em \"+ Cadastrar novo\".", tema.Aviso);
+            };
         }
 
         // =====================================================================
