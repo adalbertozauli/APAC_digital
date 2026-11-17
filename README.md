@@ -145,6 +145,19 @@ Termina com `TODOS OK`. O GitHub Actions roda os mesmos testes a cada envio. Par
 dotnet run --project .\tests\APACDigital.Tests -- telas
 ```
 
+### Vídeo de demonstração
+
+Grava o app sendo preenchido com dados fictícios, monta as cenas em 1920 × 1080 (requer Python com Pillow) e codifica o MP4 com o codificador do próprio Windows:
+
+```powershell
+dotnet run --project .\tests\APACDigital.Tests -- video
+$v = ".\tests\APACDigital.Tests\bin\Debug\net10.0-windows10.0.19041.0\win-x64\saida-testes\video"
+python .\scripts\montar-video.py $v
+dotnet run --project .\tests\APACDigital.Tests -- codificar "$v\cenas" .\docs\video\apac-digital-demo.mp4
+```
+
+A janela do app aparece na tela durante a gravação (cerca de 1 minuto). A pasta `docs\video` não vai para o Git.
+
 ### Gerar o instalador
 
 ```powershell

@@ -13,7 +13,7 @@ using WinPdf = Windows.Data.Pdf.PdfDocument;
 // Testes do APAC Digital.
 //   dotnet run --project tests\APACDigital.Tests            -> roda os testes
 //   dotnet run --project tests\APACDigital.Tests -- telas   -> salva capturas da tela e PDFs renderizados em ./saida-testes
-static class Testes
+static partial class Testes
 {
     static readonly string Base = AppContext.BaseDirectory;
     static readonly string Modelo = Path.Combine(Base, "Templates", "Laudo de APAC - Modelo.pdf");
@@ -45,6 +45,9 @@ static class Testes
         try
         {
             if (args.Contains("telas")) { Telas(); return 0; }
+            if (args.Contains("video")) { Video(); return 0; }
+            if (args.Length == 4 && args[0] == "quadro") { ExtrairQuadro(args[1], double.Parse(args[2], System.Globalization.CultureInfo.InvariantCulture), args[3]); return 0; }
+            if (args.Length == 3 && args[0] == "codificar") { Codificar(args[1], args[2]); return 0; }
             TestarPdf();
             TestarProfissionais();
             TestarUi();

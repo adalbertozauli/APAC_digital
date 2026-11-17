@@ -31,3 +31,6 @@ Saida/
 *.swp
 Thumbs.db
 desktop.ini
+
+# Vídeo de demonstração gerado localmente (arquivo grande)
+docs/video/
