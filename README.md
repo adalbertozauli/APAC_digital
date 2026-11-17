@@ -16,6 +16,12 @@ Criado na prática da Estratégia Saúde da Família (ESF São Carlos 2) para ti
 
 > Todas as imagens usam dados fictícios.
 
+
+
+https://github.com/user-attachments/assets/2c65c9f1-68d4-4558-a713-51a3644524c2
+
+
+
 ---
 
 ## O problema
