@@ -9,7 +9,7 @@ using Windows.Storage;
 // Vídeo de demonstração (uso manual), sempre com dados fictícios:
 //   dotnet run --project tests\APACDigital.Tests -- video        -> grava quadros da janela em saida-testes\video\bruto
 //   python scripts\montar-video.py <saida-testes\video>          -> monta as cenas 1920x1080 em saida-testes\video\cenas
-//   dotnet run --project tests\APACDigital.Tests -- codificar <pasta das cenas> <arquivo.mp4>
+//   dotnet run --project tests\APACDigital.Tests -- codificar <pasta das cenas> <arquivo.mp4> [720]
 static partial class Testes
 {
     static string pastaVideo = "";
@@ -131,7 +131,8 @@ static partial class Testes
     }
 
     // Junta as cenas (lista "arquivo|ms" em roteiro.txt) num MP4 com o codificador do Windows
-    static void Codificar(string pastaCenas, string saida)
+    // compacto = 1280x720 com taxa menor (ex.: para anexar no GitHub, limite de 10 MB)
+    static void Codificar(string pastaCenas, string saida, bool compacto = false)
     {
         var composicao = new MediaComposition();
         foreach (string linha in File.ReadAllLines(Path.Combine(pastaCenas, "roteiro.txt")))
@@ -145,9 +146,10 @@ static partial class Testes
         Directory.CreateDirectory(Path.GetDirectoryName(caminho)!);
         File.WriteAllBytes(caminho, Array.Empty<byte>());
         var destino = StorageFile.GetFileFromPathAsync(caminho).AsTask().Result;
-        var perfil = MediaEncodingProfile.CreateMp4(VideoEncodingQuality.HD1080p);
+        var perfil = MediaEncodingProfile.CreateMp4(compacto ? VideoEncodingQuality.HD720p : VideoEncodingQuality.HD1080p);
         perfil.Video.FrameRate.Numerator = 30; perfil.Video.FrameRate.Denominator = 1;
-        perfil.Video.Bitrate = 6_000_000;
+        perfil.Video.Bitrate = compacto ? 1_800_000u : 6_000_000u;
+        perfil.Audio = null;
         var resultado = composicao.RenderToFileAsync(destino, MediaTrimmingPreference.Precise, perfil).AsTask().Result;
         Console.WriteLine($"Vídeo: {caminho} ({resultado}) — {composicao.Duration.TotalSeconds:0.0} s");
     }

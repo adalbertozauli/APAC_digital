@@ -47,7 +47,7 @@ static partial class Testes
             if (args.Contains("telas")) { Telas(); return 0; }
             if (args.Contains("video")) { Video(); return 0; }
             if (args.Length == 4 && args[0] == "quadro") { ExtrairQuadro(args[1], double.Parse(args[2], System.Globalization.CultureInfo.InvariantCulture), args[3]); return 0; }
-            if (args.Length == 3 && args[0] == "codificar") { Codificar(args[1], args[2]); return 0; }
+            if (args.Length >= 3 && args[0] == "codificar") { Codificar(args[1], args[2], args.Length > 3 && args[3] == "720"); return 0; }
             TestarPdf();
             TestarProfissionais();
             TestarUi();
